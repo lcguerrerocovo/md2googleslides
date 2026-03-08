@@ -108,6 +108,55 @@ export default class SlideGenerator {
   }
 
   /**
+   * Returns a generator that copies a template presentation and uses
+   * its branded master for layout matching.
+   *
+   * @param {OAuth2Client} oauth2Client User credentials
+   * @param {string} title Title of presentation
+   * @param {string} templateId ID of template presentation to copy
+   * @returns {Promise.<SlideGenerator>}
+   */
+  public static async fromTemplate(
+    oauth2Client: OAuth2Client,
+    title: string,
+    templateId: string
+  ): Promise<SlideGenerator> {
+    const drive = google.drive({version: 'v3', auth: oauth2Client});
+    const res = await drive.files.copy({
+      fileId: templateId,
+      requestBody: {
+        name: title,
+      },
+    });
+    assert(res.data.id);
+    let generator = await SlideGenerator.forPresentation(
+      oauth2Client,
+      res.data.id
+    );
+    // Pick the last master (the custom/branded one in multi-master templates)
+    const masters = generator.presentation.masters;
+    if (masters && masters.length > 1) {
+      const preferredMaster = masters[masters.length - 1];
+      debug(
+        'Using master %s, removing %d other master(s)',
+        preferredMaster.objectId,
+        masters.length - 1
+      );
+      // Delete non-preferred masters so the branded one becomes the default
+      const deleteRequests = masters
+        .filter(m => m.objectId !== preferredMaster.objectId)
+        .map(m => ({deleteObject: {objectId: m.objectId}}));
+      await generator.updatePresentation({requests: deleteRequests});
+      // Reload to get the updated layout/master state
+      generator = await SlideGenerator.forPresentation(
+        oauth2Client,
+        res.data.id
+      );
+    }
+    return generator;
+  }
+
+  /**
    * Returns a generator that writes to an existing presentation.
    *
    * @param {OAuth2Client} oauth2Client User credentials

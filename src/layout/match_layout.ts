@@ -27,12 +27,19 @@ const layouts: Layout[] = [];
 
 export default function matchLayout(
   presentation: SlidesV1.Schema$Presentation,
-  slide: SlideDefinition
+  slide: SlideDefinition,
+  masterObjectId?: string
 ): GenericLayout {
   // if we have manually set the slide layout get the master from the presentation
   let layoutName: string | undefined = undefined;
   if (slide.customLayout !== undefined) {
-    const layout = presentation.layouts?.find(
+    let candidateLayouts = presentation.layouts ?? [];
+    if (masterObjectId) {
+      candidateLayouts = candidateLayouts.filter(
+        l => l.layoutProperties?.masterObjectId === masterObjectId
+      );
+    }
+    const layout = candidateLayouts.find(
       layout => layout.layoutProperties?.displayName === slide.customLayout
     );
     if (layout?.layoutProperties?.name) {
@@ -46,7 +53,7 @@ export default function matchLayout(
     }
     layoutName = layout.name;
   }
-  return new GenericLayout(layoutName, presentation, slide);
+  return new GenericLayout(layoutName, presentation, slide, masterObjectId);
 }
 
 function defineLayout(name: string, matchFn: MatchFn): void {

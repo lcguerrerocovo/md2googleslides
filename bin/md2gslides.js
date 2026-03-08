@@ -36,16 +36,7 @@ const SCOPES = [
 
 const USER_HOME =
   process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE;
-const STORED_CREDENTIALS_PATH = path.join(
-  USER_HOME,
-  '.md2googleslides',
-  'credentials.json'
-);
-const STORED_CLIENT_ID_PATH = path.join(
-  USER_HOME,
-  '.md2googleslides',
-  'client_id.json'
-);
+const BASE_CONFIG_DIR = path.join(USER_HOME, '.md2googleslides');
 
 const parser = new ArgumentParser({
   version: '1.0.0',
@@ -96,6 +87,16 @@ parser.addArgument(['-c', '--copy'], {
   dest: 'copy',
   required: false,
 });
+parser.addArgument(['--template'], {
+  help: 'Id of a template presentation to copy and use its layouts/styles',
+  dest: 'template',
+  required: false,
+});
+parser.addArgument(['-p', '--project'], {
+  help: 'GCP project subdirectory for OAuth credentials (under ~/.md2googleslides/<project>/)',
+  dest: 'project',
+  required: false,
+});
 parser.addArgument(['--use-fileio'], {
   help: 'Acknolwedge local and generated images are uploaded to https://file.io',
   action: 'storeTrue',
@@ -104,6 +105,12 @@ parser.addArgument(['--use-fileio'], {
 });
 
 const args = parser.parseArgs();
+
+const configDir = args.project
+  ? path.join(BASE_CONFIG_DIR, args.project)
+  : BASE_CONFIG_DIR;
+const STORED_CREDENTIALS_PATH = path.join(configDir, 'credentials.json');
+const STORED_CLIENT_ID_PATH = path.join(configDir, 'client_id.json');
 
 function handleError(err) {
   console.log('Unable to generate slides:', err);
@@ -166,9 +173,21 @@ function buildSlideGenerator(oauth2Client) {
   const title = args.title || args.file;
   const presentationId = args.id;
   const copyId = args.copy;
+  const templateId = args.template;
+
+  if (templateId && copyId) {
+    console.error('--template and --copy are mutually exclusive');
+    process.exit(1);
+  }
+  if (templateId && presentationId) {
+    console.error('--template and --append are mutually exclusive');
+    process.exit(1);
+  }
 
   if (presentationId) {
     return SlideGenerator.forPresentation(oauth2Client, presentationId);
+  } else if (templateId) {
+    return SlideGenerator.fromTemplate(oauth2Client, title, templateId);
   } else if (copyId) {
     return SlideGenerator.copyPresentation(oauth2Client, title, copyId);
   } else {

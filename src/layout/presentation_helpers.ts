@@ -57,12 +57,19 @@ export function pageSize(
  */
 export function findLayoutIdByName(
   presentation: SlidesV1.Schema$Presentation,
-  name: string
+  name: string,
+  masterObjectId?: string
 ): string | undefined {
   if (!presentation.layouts) {
     return undefined;
   }
-  const layout = presentation.layouts.find(
+  let candidates = presentation.layouts;
+  if (masterObjectId) {
+    candidates = candidates.filter(
+      l => l.layoutProperties?.masterObjectId === masterObjectId
+    );
+  }
+  const layout = candidates.find(
     (l): boolean => l.layoutProperties?.name === name
   );
   if (!layout) {

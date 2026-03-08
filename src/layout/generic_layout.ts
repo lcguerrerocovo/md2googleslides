@@ -50,21 +50,28 @@ export default class GenericLayout {
   public name: string;
   public presentation: SlidesV1.Schema$Presentation;
   private slide: SlideDefinition;
+  private masterObjectId?: string;
 
   public constructor(
     name: string,
     presentation: SlidesV1.Schema$Presentation,
-    slide: SlideDefinition
+    slide: SlideDefinition,
+    masterObjectId?: string
   ) {
     this.name = name;
     this.presentation = presentation;
     this.slide = slide;
+    this.masterObjectId = masterObjectId;
   }
 
   public appendCreateSlideRequest(
     requests: SlidesV1.Schema$Request[]
   ): SlidesV1.Schema$Request[] {
-    const layoutId = findLayoutIdByName(this.presentation, this.name);
+    const layoutId = findLayoutIdByName(
+      this.presentation,
+      this.name,
+      this.masterObjectId
+    );
     if (!layoutId) {
       throw new Error(`Unable to find layout ${this.name}`);
     }
