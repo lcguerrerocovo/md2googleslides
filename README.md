@@ -1,13 +1,16 @@
 Generate Google Slides from markdown & HTML. Run from the command line or embed in another
 application.
 
-This project was developed as an example of how to use the
-[Slides API](https://developers.google.com/slides).
+## Fork history
 
-While it does not yet produce stunningly beautiful decks, you are encouraged to use
-this tool for quickly prototyping presentations.
+This project is a fork of [googleworkspace/md2googleslides](https://github.com/googleworkspace/md2googleslides),
+which was developed by Google as an example of how to use the
+[Slides API](https://developers.google.com/slides). The original project is no longer maintained
+and does not work out of the box due to outdated dependencies, API changes, and broken auth.
 
-Contributions are welcome.
+Auth and dependency fixes were ported from [@wescpy/md2gslides](https://www.npmjs.com/package/@wescpy/md2gslides),
+a community fork by Wesley Chun that patched many of these issues. Thanks to Wesley for keeping
+the tool alive.
 
 ## Installation and usage
 
