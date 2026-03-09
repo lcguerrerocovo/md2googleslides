@@ -16,6 +16,7 @@ import Debug from 'debug';
 import extractSlides from './parser/extract_slides';
 import {SlideDefinition, ImageDefinition} from './slides';
 import matchLayout from './layout/match_layout';
+import {uuid} from './utils';
 import {URL} from 'url';
 import {google, slides_v1 as SlidesV1} from 'googleapis';
 import uploadLocalImage from './images/upload';
@@ -49,6 +50,9 @@ export default class SlideGenerator {
   private api: SlidesV1.Slides;
   private presentation: SlidesV1.Schema$Presentation;
   private allowUpload = false;
+  private templateSlideIds: string[] = [];
+  private masterObjectId?: string;
+  private nonPreferredMasterIds: string[] = [];
   /**
    * @param {Object} api Authorized API client instance
    * @param {Object} presentation Initial presentation data
@@ -129,28 +133,34 @@ export default class SlideGenerator {
       },
     });
     assert(res.data.id);
-    let generator = await SlideGenerator.forPresentation(
+    const generator = await SlideGenerator.forPresentation(
       oauth2Client,
       res.data.id
     );
+    // Record template slide IDs for later cloning
+    generator.templateSlideIds = (generator.presentation.slides ?? []).map(
+      s => {
+        assert(s.objectId);
+        return s.objectId;
+      }
+    );
     // Pick the last master (the custom/branded one in multi-master templates)
+    // Defer actual deletion to after template slides are cloned, since
+    // deleting a master invalidates slides associated with it.
     const masters = generator.presentation.masters;
     if (masters && masters.length > 1) {
       const preferredMaster = masters[masters.length - 1];
-      debug(
-        'Using master %s, removing %d other master(s)',
-        preferredMaster.objectId,
-        masters.length - 1
-      );
-      // Delete non-preferred masters so the branded one becomes the default
-      const deleteRequests = masters
+      generator.masterObjectId = preferredMaster.objectId ?? undefined;
+      generator.nonPreferredMasterIds = masters
         .filter(m => m.objectId !== preferredMaster.objectId)
-        .map(m => ({deleteObject: {objectId: m.objectId}}));
-      await generator.updatePresentation({requests: deleteRequests});
-      // Reload to get the updated layout/master state
-      generator = await SlideGenerator.forPresentation(
-        oauth2Client,
-        res.data.id
+        .map(m => {
+          assert(m.objectId);
+          return m.objectId;
+        });
+      debug(
+        'Using master %s, deferring removal of %d other master(s)',
+        preferredMaster.objectId,
+        generator.nonPreferredMasterIds.length
       );
     }
     return generator;
@@ -187,11 +197,24 @@ export default class SlideGenerator {
   ): Promise<string> {
     assert(this.presentation?.presentationId);
     this.slides = extractSlides(markdown, css);
+    this.validateTemplateSlides();
     this.allowUpload = useFileio;
     await this.generateImages();
     await this.probeImageSizes();
     await this.uploadLocalImages();
-    await this.updatePresentation(this.createSlides());
+    if (this.templateSlideIds.length > 0) {
+      // Template mode: clone first, then clean up, then create remaining
+      await this.updatePresentation(this.cloneTemplateSlides());
+      await this.deleteTemplateSlidesAndMasters();
+      // After deleting template slides, the branded master may be gone.
+      // Clear masterObjectId so new slides use whatever master remains.
+      this.masterObjectId = undefined;
+      await this.reloadPresentation();
+      await this.updatePresentation(this.createNewSlides());
+      await this.reorderSlides();
+    } else {
+      await this.updatePresentation(this.createSlides());
+    }
     await this.reloadPresentation();
     await this.updatePresentation(this.populateSlides());
     return this.presentation.presentationId;
@@ -219,6 +242,58 @@ export default class SlideGenerator {
       presentationId: this.presentation.presentationId,
       requestBody: batch,
     });
+  }
+
+  protected validateTemplateSlides(): void {
+    for (const slide of this.slides) {
+      if (slide.templateSlide !== undefined) {
+        if (this.templateSlideIds.length === 0) {
+          throw new Error(
+            '{template_slide=N} requires --template flag'
+          );
+        }
+        if (
+          slide.templateSlide < 1 ||
+          slide.templateSlide > this.templateSlideIds.length
+        ) {
+          throw new Error(
+            `template_slide=${slide.templateSlide} is out of range ` +
+              `(template has ${this.templateSlideIds.length} slides)`
+          );
+        }
+      }
+    }
+  }
+
+  protected async deleteTemplateSlidesAndMasters(): Promise<void> {
+    assert(this.presentation?.presentationId);
+    const requests: SlidesV1.Schema$Request[] = [];
+
+    // Delete all original template slides
+    for (const id of this.templateSlideIds) {
+      requests.push({deleteObject: {objectId: id}});
+    }
+
+    await this.updatePresentation({requests});
+  }
+
+  protected async reorderSlides(): Promise<void> {
+    await this.reloadPresentation();
+    const requests: SlidesV1.Schema$Request[] = [];
+    for (let i = 0; i < this.slides.length; i++) {
+      const slideId = this.slides[i].objectId;
+      if (slideId) {
+        requests.push({
+          updateSlidesPosition: {
+            slideObjectIds: [slideId],
+            insertionIndex: i,
+          },
+        });
+      }
+    }
+    if (requests.length > 0) {
+      await this.updatePresentation({requests});
+    }
   }
 
   protected async processImages<T>(
@@ -279,14 +354,64 @@ export default class SlideGenerator {
    *
    * @returns {{requests: Array}}
    */
-  protected createSlides(): SlidesV1.Schema$BatchUpdatePresentationRequest {
-    debug('Creating slides');
-    const batch = {
+  protected cloneTemplateSlides(): SlidesV1.Schema$BatchUpdatePresentationRequest {
+    debug('Cloning template slides');
+    const batch: SlidesV1.Schema$BatchUpdatePresentationRequest = {
       requests: [],
     };
     for (const slide of this.slides) {
-      const layout = matchLayout(this.presentation, slide);
-      layout.appendCreateSlideRequest(batch.requests);
+      if (slide.templateSlide !== undefined) {
+        const templateIndex = slide.templateSlide - 1; // 1-based to 0-based
+        const sourceObjectId = this.templateSlideIds[templateIndex];
+        const newObjectId = uuid();
+        slide.objectId = newObjectId;
+        debug(
+          'Cloning template slide %d (%s) as %s',
+          slide.templateSlide,
+          sourceObjectId,
+          newObjectId
+        );
+        batch.requests!.push({
+          duplicateObject: {
+            objectId: sourceObjectId,
+            objectIds: {[sourceObjectId]: newObjectId},
+          },
+        });
+      }
+    }
+    return batch;
+  }
+
+  protected createNewSlides(): SlidesV1.Schema$BatchUpdatePresentationRequest {
+    debug('Creating new slides');
+    const batch: SlidesV1.Schema$BatchUpdatePresentationRequest = {
+      requests: [],
+    };
+    for (const slide of this.slides) {
+      if (slide.templateSlide === undefined) {
+        const layout = matchLayout(
+          this.presentation,
+          slide,
+          this.masterObjectId
+        );
+        layout.appendCreateSlideRequest(batch.requests!);
+      }
+    }
+    return batch;
+  }
+
+  protected createSlides(): SlidesV1.Schema$BatchUpdatePresentationRequest {
+    debug('Creating slides');
+    const batch: SlidesV1.Schema$BatchUpdatePresentationRequest = {
+      requests: [],
+    };
+    for (const slide of this.slides) {
+      const layout = matchLayout(
+        this.presentation,
+        slide,
+        this.masterObjectId
+      );
+      layout.appendCreateSlideRequest(batch.requests!);
     }
     return batch;
   }
@@ -305,7 +430,7 @@ export default class SlideGenerator {
       requests: [],
     };
     for (const slide of this.slides) {
-      const layout = matchLayout(this.presentation, slide);
+      const layout = matchLayout(this.presentation, slide, this.masterObjectId);
       layout.appendContentRequests(batch.requests);
     }
     return batch;

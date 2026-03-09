@@ -196,6 +196,11 @@ function buildSlideGenerator(oauth2Client) {
 }
 
 function eraseIfNeeded(slideGenerator) {
+  if (args.template) {
+    // Template slides are needed for cloning; they'll be cleaned up
+    // after cloning in generateFromMarkdown()
+    return Promise.resolve(slideGenerator);
+  }
   if (args.erase || !args.id) {
     return slideGenerator.erase().then(() => {
       return slideGenerator;

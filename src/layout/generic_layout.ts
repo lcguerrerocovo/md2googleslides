@@ -193,6 +193,16 @@ export default class GenericLayout {
       | Partial<SlidesV1.Schema$CreateParagraphBulletsRequest>,
     requests: SlidesV1.Schema$Request[]
   ): void {
+    // Clear existing placeholder text on cloned template slides
+    if (this.slide.templateSlide !== undefined && locationProps.objectId) {
+      requests.push({
+        deleteText: {
+          objectId: locationProps.objectId,
+          textRange: {type: 'ALL'},
+        },
+      });
+    }
+
     // Insert the raw text first
     const request = {
       insertText: extend(

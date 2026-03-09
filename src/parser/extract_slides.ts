@@ -198,6 +198,11 @@ inlineTokenRules['paragraph_open'] = (token, context) => {
   if (layout !== undefined && layout !== '') {
     context.currentSlide.customLayout = layout;
   }
+
+  const templateSlide = attr(token, 'template_slide');
+  if (templateSlide !== undefined && templateSlide !== '') {
+    context.currentSlide.templateSlide = parseInt(templateSlide, 10);
+  }
 };
 
 inlineTokenRules['paragraph_close'] = (token, context) => {
