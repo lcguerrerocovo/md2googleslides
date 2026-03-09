@@ -15,6 +15,7 @@
 import GenericLayout from './generic_layout';
 import {slides_v1 as SlidesV1} from 'googleapis';
 import {SlideDefinition, TextDefinition} from '../slides';
+import {TemplateManifest} from './template_manifest';
 
 type MatchFn = (slide: SlideDefinition) => boolean;
 
@@ -28,7 +29,8 @@ const layouts: Layout[] = [];
 export default function matchLayout(
   presentation: SlidesV1.Schema$Presentation,
   slide: SlideDefinition,
-  masterObjectId?: string
+  masterObjectId?: string,
+  manifest?: TemplateManifest
 ): GenericLayout {
   // if we have manually set the slide layout get the master from the presentation
   let layoutName: string | undefined = undefined;
@@ -53,7 +55,7 @@ export default function matchLayout(
     }
     layoutName = layout.name;
   }
-  return new GenericLayout(layoutName, presentation, slide, masterObjectId);
+  return new GenericLayout(layoutName, presentation, slide, masterObjectId, manifest);
 }
 
 function defineLayout(name: string, matchFn: MatchFn): void {

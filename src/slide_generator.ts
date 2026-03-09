@@ -16,6 +16,7 @@ import Debug from 'debug';
 import extractSlides from './parser/extract_slides';
 import {SlideDefinition, ImageDefinition} from './slides';
 import matchLayout from './layout/match_layout';
+import {TemplateManifest} from './layout/template_manifest';
 import {uuid} from './utils';
 import {URL} from 'url';
 import {google, slides_v1 as SlidesV1} from 'googleapis';
@@ -53,6 +54,7 @@ export default class SlideGenerator {
   private templateSlideIds: string[] = [];
   private masterObjectId?: string;
   private nonPreferredMasterIds: string[] = [];
+  private manifest?: TemplateManifest;
   /**
    * @param {Object} api Authorized API client instance
    * @param {Object} presentation Initial presentation data
@@ -64,6 +66,10 @@ export default class SlideGenerator {
   ) {
     this.api = api;
     this.presentation = presentation;
+  }
+
+  public setManifest(manifest: TemplateManifest): void {
+    this.manifest = manifest;
   }
 
   /**
@@ -430,7 +436,12 @@ export default class SlideGenerator {
       requests: [],
     };
     for (const slide of this.slides) {
-      const layout = matchLayout(this.presentation, slide, this.masterObjectId);
+      const layout = matchLayout(
+        this.presentation,
+        slide,
+        this.masterObjectId,
+        this.manifest
+      );
       layout.appendContentRequests(batch.requests);
     }
     return batch;

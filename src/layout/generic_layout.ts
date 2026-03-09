@@ -31,6 +31,11 @@ import {
   findPlaceholder,
   findSpeakerNotesObjectId,
 } from './presentation_helpers';
+import {
+  ManifestSlotDef,
+  TemplateManifest,
+  resolveSlotObjectId,
+} from './template_manifest';
 import assert from 'assert';
 
 const debug = Debug('md2gslides');
@@ -51,17 +56,20 @@ export default class GenericLayout {
   public presentation: SlidesV1.Schema$Presentation;
   private slide: SlideDefinition;
   private masterObjectId?: string;
+  private manifest?: TemplateManifest;
 
   public constructor(
     name: string,
     presentation: SlidesV1.Schema$Presentation,
     slide: SlideDefinition,
-    masterObjectId?: string
+    masterObjectId?: string,
+    manifest?: TemplateManifest
   ) {
     this.name = name;
     this.presentation = presentation;
     this.slide = slide;
     this.masterObjectId = masterObjectId;
+    this.manifest = manifest;
   }
 
   public appendCreateSlideRequest(
@@ -92,6 +100,89 @@ export default class GenericLayout {
   public appendContentRequests(
     requests: SlidesV1.Schema$Request[]
   ): SlidesV1.Schema$Request[] {
+    if (this.slide.templateSlide !== undefined && this.manifest) {
+      const slideDef = this.manifest.slides[this.slide.templateSlide];
+      if (slideDef) {
+        assert(this.slide.objectId);
+        // Title
+        if (this.slide.title && slideDef.slots.title) {
+          const objectId = resolveSlotObjectId(
+            this.presentation,
+            this.slide.objectId,
+            slideDef.slots.title
+          );
+          if (objectId) {
+            this.appendInsertTextRequests(
+              this.slide.title,
+              {objectId},
+              requests
+            );
+          }
+        }
+        // Subtitle
+        if (this.slide.subtitle && slideDef.slots.subtitle) {
+          const objectId = resolveSlotObjectId(
+            this.presentation,
+            this.slide.objectId,
+            slideDef.slots.subtitle
+          );
+          if (objectId) {
+            this.appendInsertTextRequests(
+              this.slide.subtitle,
+              {objectId},
+              requests
+            );
+          }
+        }
+        // Bodies
+        const bodySlots = [
+          slideDef.slots.body ?? slideDef.slots.body_0,
+          slideDef.slots.body_1,
+        ].filter(
+          (s): s is ManifestSlotDef => s !== undefined && s !== null
+        );
+        for (
+          let i = 0;
+          i < Math.min(bodySlots.length, this.slide.bodies.length);
+          i++
+        ) {
+          const objectId = resolveSlotObjectId(
+            this.presentation,
+            this.slide.objectId,
+            bodySlots[i]
+          );
+          if (objectId && this.slide.bodies[i].text) {
+            this.appendInsertTextRequests(
+              this.slide.bodies[i].text!,
+              {objectId},
+              requests
+            );
+          }
+        }
+      }
+      // Background image
+      if (this.slide.backgroundImage) {
+        this.appendSetBackgroundImageRequest(
+          this.slide.backgroundImage,
+          requests
+        );
+      }
+      // Notes
+      if (this.slide.notes) {
+        assert(this.slide.objectId);
+        const objectId = findSpeakerNotesObjectId(
+          this.presentation,
+          this.slide.objectId
+        );
+        this.appendInsertTextRequests(
+          this.slide.notes,
+          {objectId: objectId},
+          requests
+        );
+      }
+      return requests;
+    }
+
     this.appendFillPlaceholderTextRequest(this.slide.title, 'TITLE', requests);
     this.appendFillPlaceholderTextRequest(
       this.slide.title,

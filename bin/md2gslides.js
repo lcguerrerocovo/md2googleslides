@@ -27,6 +27,8 @@ const ArgumentParser = require('argparse').ArgumentParser;
 const {authenticate} = require('@google-cloud/local-auth');
 const {google} = require('googleapis');
 const SlideGenerator = require('../lib/slide_generator').default;
+const {analyzeTemplate} = require('../lib/analyze_template');
+const {loadManifest} = require('../lib/layout/template_manifest');
 const opener = require('opener');
 
 const SCOPES = [
@@ -101,6 +103,16 @@ parser.addArgument(['--use-fileio'], {
   help: 'Acknolwedge local and generated images are uploaded to https://file.io',
   action: 'storeTrue',
   dest: 'useFileio',
+  required: false,
+});
+parser.addArgument(['--analyze-template'], {
+  help: 'Analyze a template presentation and output JSON metadata for its text boxes',
+  dest: 'analyzeTemplate',
+  required: false,
+});
+parser.addArgument(['--manifest'], {
+  help: 'Path to a YAML manifest mapping template text boxes to content slots',
+  dest: 'manifest',
   required: false,
 });
 
@@ -249,9 +261,26 @@ function displayResults(id) {
     opener(url);
   }
 }
-authorize()
-  .then(buildSlideGenerator)
-  .then(eraseIfNeeded)
-  .then(generateSlides)
-  .then(displayResults)
-  .catch(handleError);
+if (args.analyzeTemplate) {
+  authorize()
+    .then(oauth2Client => {
+      const api = google.slides({version: 'v1', auth: oauth2Client});
+      return analyzeTemplate(api, args.analyzeTemplate);
+    })
+    .catch(handleError);
+} else {
+  authorize()
+    .then(buildSlideGenerator)
+    .then(slideGenerator => {
+      if (args.manifest) {
+        const manifestPath = path.resolve(args.manifest);
+        const manifest = loadManifest(manifestPath);
+        slideGenerator.setManifest(manifest);
+      }
+      return slideGenerator;
+    })
+    .then(eraseIfNeeded)
+    .then(generateSlides)
+    .then(displayResults)
+    .catch(handleError);
+}
