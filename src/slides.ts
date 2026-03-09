@@ -67,7 +67,7 @@ export interface SlideDefinition {
   index?: number;
   objectId?: string;
   customLayout?: string;
-  templateSlide?: number;
+  templateSlide?: number | string;
   title?: TextDefinition;
   subtitle?: TextDefinition;
   backgroundImage?: ImageDefinition;

@@ -203,9 +203,11 @@ inlineTokenRules['paragraph_open'] = (token, context) => {
   if (templateSlide !== undefined && templateSlide !== '') {
     const parsed = parseInt(templateSlide, 10);
     if (isNaN(parsed)) {
-      throw new Error(`Invalid template_slide value: "${templateSlide}" (must be a number)`);
+      // Non-numeric value — treat as a slide name to resolve via manifest
+      context.currentSlide.templateSlide = templateSlide;
+    } else {
+      context.currentSlide.templateSlide = parsed;
     }
-    context.currentSlide.templateSlide = parsed;
   }
 };
 

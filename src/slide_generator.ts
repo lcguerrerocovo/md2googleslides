@@ -16,7 +16,7 @@ import Debug from 'debug';
 import extractSlides from './parser/extract_slides';
 import {SlideDefinition, ImageDefinition} from './slides';
 import matchLayout from './layout/match_layout';
-import {TemplateManifest} from './layout/template_manifest';
+import {TemplateManifest, resolveSlideNameToNumber} from './layout/template_manifest';
 import {uuid} from './utils';
 import {URL} from 'url';
 import {google, slides_v1 as SlidesV1} from 'googleapis';
@@ -196,6 +196,7 @@ export default class SlideGenerator {
   ): Promise<string> {
     assert(this.presentation?.presentationId);
     this.slides = extractSlides(markdown, css).slides;
+    this.resolveTemplateSlideNames();
     this.validateTemplateSlides();
     this.allowUpload = useFileio;
     await this.generateImages();
@@ -243,9 +244,28 @@ export default class SlideGenerator {
     });
   }
 
+  protected resolveTemplateSlideNames(): void {
+    if (!this.manifest) {
+      return;
+    }
+    for (const slide of this.slides) {
+      if (typeof slide.templateSlide === 'string') {
+        slide.templateSlide = resolveSlideNameToNumber(
+          this.manifest,
+          slide.templateSlide
+        );
+      }
+    }
+  }
+
   protected validateTemplateSlides(): void {
     for (const slide of this.slides) {
       if (slide.templateSlide !== undefined) {
+        if (typeof slide.templateSlide === 'string') {
+          throw new Error(
+            `template_slide="${slide.templateSlide}" requires --manifest flag to resolve slide names`
+          );
+        }
         if (this.templateSlideIds.length === 0) {
           throw new Error(
             '{template_slide=N} requires --template flag'
@@ -361,7 +381,7 @@ export default class SlideGenerator {
     };
     for (const slide of this.slides) {
       if (slide.templateSlide !== undefined) {
-        const templateIndex = slide.templateSlide - 1; // 1-based to 0-based
+        const templateIndex = (slide.templateSlide as number) - 1; // 1-based to 0-based
         const sourceObjectId = this.templateSlideIds[templateIndex];
         const newObjectId = uuid();
         slide.objectId = newObjectId;

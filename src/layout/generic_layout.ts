@@ -101,8 +101,8 @@ export default class GenericLayout {
     requests: SlidesV1.Schema$Request[]
   ): SlidesV1.Schema$Request[] {
     if (this.slide.templateSlide !== undefined && this.manifest) {
-      const slideDef = this.manifest.slides[this.slide.templateSlide];
-      if (slideDef) {
+      const slideDef = this.manifest.slides[this.slide.templateSlide as number];
+      if (slideDef && slideDef.slots) {
         assert(this.slide.objectId);
         // Title
         if (this.slide.title && slideDef.slots.title) {

@@ -9,7 +9,8 @@ export interface ManifestSlotDef {
 
 export interface ManifestSlideDef {
   name?: string;
-  slots: Record<string, ManifestSlotDef>;
+  preview?: string;
+  slots?: Record<string, ManifestSlotDef>;
 }
 
 export interface TemplateManifest {
@@ -24,18 +25,39 @@ export function loadManifest(filePath: string): TemplateManifest {
     throw new Error(`Invalid manifest: missing or invalid "slides" key in ${filePath}`);
   }
   for (const [slideNum, slideDef] of Object.entries(data.slides)) {
-    if (!slideDef || typeof slideDef.slots !== 'object') {
-      throw new Error(`Invalid manifest: slide ${slideNum} missing "slots" in ${filePath}`);
+    if (!slideDef) {
+      throw new Error(`Invalid manifest: slide ${slideNum} is empty in ${filePath}`);
     }
-    for (const [slotName, slotDef] of Object.entries(slideDef.slots)) {
-      if (typeof slotDef?.element_index !== 'number') {
-        throw new Error(
-          `Invalid manifest: slide ${slideNum} slot "${slotName}" missing numeric "element_index" in ${filePath}`
-        );
+    if (slideDef.slots) {
+      for (const [slotName, slotDef] of Object.entries(slideDef.slots)) {
+        if (typeof slotDef?.element_index !== 'number') {
+          throw new Error(
+            `Invalid manifest: slide ${slideNum} slot "${slotName}" missing numeric "element_index" in ${filePath}`
+          );
+        }
       }
     }
   }
   return data;
+}
+
+export function resolveSlideNameToNumber(
+  manifest: TemplateManifest,
+  name: string
+): number {
+  for (const [slideNum, slideDef] of Object.entries(manifest.slides)) {
+    if (slideDef.name === name) {
+      return parseInt(slideNum, 10);
+    }
+  }
+  const available = Object.values(manifest.slides)
+    .map(s => s.name)
+    .filter(Boolean)
+    .map(n => `"${n}"`)
+    .join(', ');
+  throw new Error(
+    `Unknown template slide name "${name}". Available: ${available}`
+  );
 }
 
 export function resolveSlotObjectId(

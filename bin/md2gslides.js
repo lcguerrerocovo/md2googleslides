@@ -130,6 +130,8 @@ let markdownSource = null;
 let markdownInput = null;
 let frontmatter = null;
 let idFromFrontmatter = false;
+let previousDeckId = null;
+let oauth2Client = null;
 
 if (args.file) {
   markdownSource = path.resolve(args.file);
@@ -151,6 +153,14 @@ if (args.file) {
     }
     if (!args.manifest && frontmatter.manifest) {
       args.manifest = frontmatter.manifest;
+    }
+    // When template is active, it creates a fresh deck each run.
+    // Don't set id — it would conflict with template mode.
+    // Track old ID so we can delete the previous deck after the new one is created.
+    if (args.template && idFromFrontmatter) {
+      previousDeckId = args.id;
+      args.id = null;
+      idFromFrontmatter = false;
     }
   }
 }
@@ -294,17 +304,23 @@ function generateSlides(slideGenerator) {
 }
 
 function writeFrontmatterId(id) {
-  if (!markdownSource || idFromFrontmatter || !args.file) {
+  if (!markdownSource || !args.file) {
     return;
   }
   const raw = fs.readFileSync(markdownSource, {encoding: 'UTF-8'});
   let updated;
   const fmMatch = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
   if (fmMatch) {
-    // Frontmatter exists but has no id — add it
     const fmBlock = fmMatch[1];
-    const newFmBlock = fmBlock + '\nid: ' + id;
-    updated = raw.replace(fmMatch[0], '---\n' + newFmBlock + '\n---\n');
+    if (fmBlock.match(/^id:\s+/m)) {
+      // Replace existing id
+      const newFmBlock = fmBlock.replace(/^id:\s+.*$/m, 'id: ' + id);
+      updated = raw.replace(fmMatch[0], '---\n' + newFmBlock + '\n---\n');
+    } else {
+      // Add id to existing frontmatter
+      const newFmBlock = fmBlock + '\nid: ' + id;
+      updated = raw.replace(fmMatch[0], '---\n' + newFmBlock + '\n---\n');
+    }
   } else {
     // No frontmatter — prepend one
     updated = '---\nid: ' + id + '\n---\n' + raw;
@@ -313,8 +329,22 @@ function writeFrontmatterId(id) {
   console.log('Saved presentation ID to %s', args.file);
 }
 
-function displayResults(id) {
+async function deletePreviousDeck() {
+  if (!previousDeckId || !oauth2Client) {
+    return;
+  }
+  try {
+    const drive = google.drive({version: 'v3', auth: oauth2Client});
+    await drive.files.delete({fileId: previousDeckId});
+    console.log('Deleted previous deck %s', previousDeckId);
+  } catch (err) {
+    console.warn('Could not delete previous deck %s: %s', previousDeckId, err.message);
+  }
+}
+
+async function displayResults(id) {
   writeFrontmatterId(id);
+  await deletePreviousDeck();
   const url = 'https://docs.google.com/presentation/d/' + id;
   if (args.headless) {
     console.log('View your presentation at: %s', url);
@@ -332,6 +362,10 @@ if (args.analyzeTemplate) {
     .catch(handleError);
 } else {
   authorize()
+    .then(client => {
+      oauth2Client = client;
+      return client;
+    })
     .then(buildSlideGenerator)
     .then(slideGenerator => {
       if (args.manifest) {
