@@ -58,10 +58,10 @@ Use `--template <ID>` to copy a Google Slides template and clone specific slides
 1. **Analyze the template** to discover text box positions:
 
 ```sh
-md2gslides --analyze-template <TEMPLATE_ID> -p <project> > template-metadata.json
+md2gslides --analyze-template <TEMPLATE_ID> -p <project> > template-manifest.yaml
 ```
 
-2. **Create a YAML manifest** mapping text boxes to content slots. Use the `element_index` values from the JSON output:
+2. **Review and adjust the YAML manifest** — the output includes auto-classified slots. Use the `element_index` values and text box comments to verify:
 
 ```yaml
 template_id: "<TEMPLATE_ID>"

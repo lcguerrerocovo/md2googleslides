@@ -113,7 +113,7 @@ parser.addArgument(['--use-fileio'], {
   required: false,
 });
 parser.addArgument(['--analyze-template'], {
-  help: 'Analyze a template presentation and output JSON metadata for its text boxes',
+  help: 'Analyze a template presentation and output a YAML manifest with slot classifications',
   dest: 'analyzeTemplate',
   required: false,
 });
