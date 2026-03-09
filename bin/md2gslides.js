@@ -27,6 +27,8 @@ const ArgumentParser = require('argparse').ArgumentParser;
 const {authenticate} = require('@google-cloud/local-auth');
 const {google} = require('googleapis');
 const SlideGenerator = require('../lib/slide_generator').default;
+const {analyzeTemplate} = require('../lib/analyze_template');
+const {loadManifest} = require('../lib/layout/template_manifest');
 const opener = require('opener');
 
 const SCOPES = [
@@ -36,16 +38,7 @@ const SCOPES = [
 
 const USER_HOME =
   process.env.HOME || process.env.HOMEPATH || process.env.USERPROFILE;
-const STORED_CREDENTIALS_PATH = path.join(
-  USER_HOME,
-  '.md2googleslides',
-  'credentials.json'
-);
-const STORED_CLIENT_ID_PATH = path.join(
-  USER_HOME,
-  '.md2googleslides',
-  'client_id.json'
-);
+const BASE_CONFIG_DIR = path.join(USER_HOME, '.md2googleslides');
 
 const parser = new ArgumentParser({
   version: '1.0.0',
@@ -96,14 +89,40 @@ parser.addArgument(['-c', '--copy'], {
   dest: 'copy',
   required: false,
 });
+parser.addArgument(['--template'], {
+  help: 'Id of a template presentation to copy and use its layouts/styles',
+  dest: 'template',
+  required: false,
+});
+parser.addArgument(['-p', '--project'], {
+  help: 'GCP project subdirectory for OAuth credentials (under ~/.md2googleslides/<project>/)',
+  dest: 'project',
+  required: false,
+});
 parser.addArgument(['--use-fileio'], {
   help: 'Acknolwedge local and generated images are uploaded to https://file.io',
   action: 'storeTrue',
   dest: 'useFileio',
   required: false,
 });
+parser.addArgument(['--analyze-template'], {
+  help: 'Analyze a template presentation and output JSON metadata for its text boxes',
+  dest: 'analyzeTemplate',
+  required: false,
+});
+parser.addArgument(['--manifest'], {
+  help: 'Path to a YAML manifest mapping template text boxes to content slots',
+  dest: 'manifest',
+  required: false,
+});
 
 const args = parser.parseArgs();
+
+const configDir = args.project
+  ? path.join(BASE_CONFIG_DIR, args.project)
+  : BASE_CONFIG_DIR;
+const STORED_CREDENTIALS_PATH = path.join(configDir, 'credentials.json');
+const STORED_CLIENT_ID_PATH = path.join(configDir, 'client_id.json');
 
 function handleError(err) {
   console.log('Unable to generate slides:', err);
@@ -166,9 +185,21 @@ function buildSlideGenerator(oauth2Client) {
   const title = args.title || args.file;
   const presentationId = args.id;
   const copyId = args.copy;
+  const templateId = args.template;
+
+  if (templateId && copyId) {
+    console.error('--template and --copy are mutually exclusive');
+    process.exit(1);
+  }
+  if (templateId && presentationId) {
+    console.error('--template and --append are mutually exclusive');
+    process.exit(1);
+  }
 
   if (presentationId) {
     return SlideGenerator.forPresentation(oauth2Client, presentationId);
+  } else if (templateId) {
+    return SlideGenerator.fromTemplate(oauth2Client, title, templateId);
   } else if (copyId) {
     return SlideGenerator.copyPresentation(oauth2Client, title, copyId);
   } else {
@@ -177,6 +208,11 @@ function buildSlideGenerator(oauth2Client) {
 }
 
 function eraseIfNeeded(slideGenerator) {
+  if (args.template) {
+    // Template slides are needed for cloning; they'll be cleaned up
+    // after cloning in generateFromMarkdown()
+    return Promise.resolve(slideGenerator);
+  }
   if (args.erase || !args.id) {
     return slideGenerator.erase().then(() => {
       return slideGenerator;
@@ -225,9 +261,26 @@ function displayResults(id) {
     opener(url);
   }
 }
-authorize()
-  .then(buildSlideGenerator)
-  .then(eraseIfNeeded)
-  .then(generateSlides)
-  .then(displayResults)
-  .catch(handleError);
+if (args.analyzeTemplate) {
+  authorize()
+    .then(oauth2Client => {
+      const api = google.slides({version: 'v1', auth: oauth2Client});
+      return analyzeTemplate(api, args.analyzeTemplate);
+    })
+    .catch(handleError);
+} else {
+  authorize()
+    .then(buildSlideGenerator)
+    .then(slideGenerator => {
+      if (args.manifest) {
+        const manifestPath = path.resolve(args.manifest);
+        const manifest = loadManifest(manifestPath);
+        slideGenerator.setManifest(manifest);
+      }
+      return slideGenerator;
+    })
+    .then(eraseIfNeeded)
+    .then(generateSlides)
+    .then(displayResults)
+    .catch(handleError);
+}

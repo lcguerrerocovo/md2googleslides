@@ -198,6 +198,15 @@ inlineTokenRules['paragraph_open'] = (token, context) => {
   if (layout !== undefined && layout !== '') {
     context.currentSlide.customLayout = layout;
   }
+
+  const templateSlide = attr(token, 'template_slide');
+  if (templateSlide !== undefined && templateSlide !== '') {
+    const parsed = parseInt(templateSlide, 10);
+    if (isNaN(parsed)) {
+      throw new Error(`Invalid template_slide value: "${templateSlide}" (must be a number)`);
+    }
+    context.currentSlide.templateSlide = parsed;
+  }
 };
 
 inlineTokenRules['paragraph_close'] = (token, context) => {
