@@ -19,7 +19,23 @@ export interface TemplateManifest {
 
 export function loadManifest(filePath: string): TemplateManifest {
   const content = fs.readFileSync(filePath, 'utf-8');
-  return yaml.load(content) as TemplateManifest;
+  const data = yaml.load(content) as TemplateManifest;
+  if (!data || typeof data.slides !== 'object') {
+    throw new Error(`Invalid manifest: missing or invalid "slides" key in ${filePath}`);
+  }
+  for (const [slideNum, slideDef] of Object.entries(data.slides)) {
+    if (!slideDef || typeof slideDef.slots !== 'object') {
+      throw new Error(`Invalid manifest: slide ${slideNum} missing "slots" in ${filePath}`);
+    }
+    for (const [slotName, slotDef] of Object.entries(slideDef.slots)) {
+      if (typeof slotDef?.element_index !== 'number') {
+        throw new Error(
+          `Invalid manifest: slide ${slideNum} slot "${slotName}" missing numeric "element_index" in ${filePath}`
+        );
+      }
+    }
+  }
+  return data;
 }
 
 export function resolveSlotObjectId(

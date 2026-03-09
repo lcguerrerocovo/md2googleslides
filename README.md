@@ -49,6 +49,68 @@ deck, just get the ID of the already generated slides. For example, you can use 
 md2gslides slides.md --title "Talk Title" --append <some id> --erase
 ```
 
+## Template integration
+
+Use `--template <ID>` to copy a Google Slides template and clone specific slides from it. This preserves all visual branding (backgrounds, shapes, logos, colors) from the template.
+
+### Workflow
+
+1. **Analyze the template** to discover text box positions:
+
+```sh
+md2gslides --analyze-template <TEMPLATE_ID> -p <project> > template-metadata.json
+```
+
+2. **Create a YAML manifest** mapping text boxes to content slots. Use the `element_index` values from the JSON output:
+
+```yaml
+template_id: "<TEMPLATE_ID>"
+slides:
+  8:
+    name: "Title slide"
+    slots:
+      title:
+        element_index: 1
+      subtitle:
+        element_index: 2
+  27:
+    name: "Content slide"
+    slots:
+      title:
+        element_index: 0
+      body:
+        element_index: 1
+```
+
+3. **Reference template slides in markdown** using `{template_slide=N}` (1-based index):
+
+<pre>
+{template_slide=8}
+
+# Presentation Title
+## Subtitle goes here
+
+---
+
+{template_slide=27}
+
+# Slide heading
+
+Body content here
+</pre>
+
+4. **Generate the deck:**
+
+```sh
+md2gslides slides.md --template <TEMPLATE_ID> --manifest manifest.yaml -p <project> --title "My Deck"
+```
+
+Slides with `{template_slide=N}` are cloned from the template with full visual branding. Slides without it are created with the default layout.
+
+### Multi-project credentials
+
+Use `-p <project>` or `--project <project>` to store OAuth credentials in a subdirectory under `~/.md2googleslides/<project>/`. This allows using different GCP projects for different templates or accounts.
+
 ## Supported markdown rules
 
 md2gslides uses a subset of the [CommonMark](http://spec.commonmark.org/0.26/) and

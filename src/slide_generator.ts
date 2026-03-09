@@ -53,7 +53,6 @@ export default class SlideGenerator {
   private allowUpload = false;
   private templateSlideIds: string[] = [];
   private masterObjectId?: string;
-  private nonPreferredMasterIds: string[] = [];
   private manifest?: TemplateManifest;
   /**
    * @param {Object} api Authorized API client instance
@@ -157,16 +156,10 @@ export default class SlideGenerator {
     if (masters && masters.length > 1) {
       const preferredMaster = masters[masters.length - 1];
       generator.masterObjectId = preferredMaster.objectId ?? undefined;
-      generator.nonPreferredMasterIds = masters
-        .filter(m => m.objectId !== preferredMaster.objectId)
-        .map(m => {
-          assert(m.objectId);
-          return m.objectId;
-        });
       debug(
-        'Using master %s, deferring removal of %d other master(s)',
+        'Using master %s (%d other master(s) present)',
         preferredMaster.objectId,
-        generator.nonPreferredMasterIds.length
+        masters.length - 1
       );
     }
     return generator;
@@ -211,7 +204,7 @@ export default class SlideGenerator {
     if (this.templateSlideIds.length > 0) {
       // Template mode: clone first, then clean up, then create remaining
       await this.updatePresentation(this.cloneTemplateSlides());
-      await this.deleteTemplateSlidesAndMasters();
+      await this.deleteTemplateSlides();
       // After deleting template slides, the branded master may be gone.
       // Clear masterObjectId so new slides use whatever master remains.
       this.masterObjectId = undefined;
@@ -271,7 +264,7 @@ export default class SlideGenerator {
     }
   }
 
-  protected async deleteTemplateSlidesAndMasters(): Promise<void> {
+  protected async deleteTemplateSlides(): Promise<void> {
     assert(this.presentation?.presentationId);
     const requests: SlidesV1.Schema$Request[] = [];
 
@@ -285,20 +278,21 @@ export default class SlideGenerator {
 
   protected async reorderSlides(): Promise<void> {
     await this.reloadPresentation();
-    const requests: SlidesV1.Schema$Request[] = [];
+    // Each position update shifts indices, so send them individually
     for (let i = 0; i < this.slides.length; i++) {
       const slideId = this.slides[i].objectId;
       if (slideId) {
-        requests.push({
-          updateSlidesPosition: {
-            slideObjectIds: [slideId],
-            insertionIndex: i,
-          },
+        await this.updatePresentation({
+          requests: [
+            {
+              updateSlidesPosition: {
+                slideObjectIds: [slideId],
+                insertionIndex: i,
+              },
+            },
+          ],
         });
       }
-    }
-    if (requests.length > 0) {
-      await this.updatePresentation({requests});
     }
   }
 

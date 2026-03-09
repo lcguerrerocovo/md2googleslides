@@ -201,7 +201,11 @@ inlineTokenRules['paragraph_open'] = (token, context) => {
 
   const templateSlide = attr(token, 'template_slide');
   if (templateSlide !== undefined && templateSlide !== '') {
-    context.currentSlide.templateSlide = parseInt(templateSlide, 10);
+    const parsed = parseInt(templateSlide, 10);
+    if (isNaN(parsed)) {
+      throw new Error(`Invalid template_slide value: "${templateSlide}" (must be a number)`);
+    }
+    context.currentSlide.templateSlide = parsed;
   }
 };
 
