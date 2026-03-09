@@ -14,6 +14,7 @@
 
 import markdownIt from 'markdown-it';
 import Token from 'markdown-it/lib/token';
+import yaml from 'js-yaml';
 // @ts-ignore
 import attrs from 'markdown-it-attrs';
 // @ts-ignore
@@ -48,6 +49,24 @@ const parser = markdownIt(mdOptions)
   .use(expandTabs, {tabWidth: 4})
   .use(generatedImage)
   .use(video, {youtube: {width: 640, height: 390}});
+
+export interface FrontmatterResult {
+  frontmatter: Record<string, string> | null;
+  content: string;
+}
+
+export function extractFrontmatter(input: string): FrontmatterResult {
+  const match = input.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n([\s\S]*)$/);
+  if (!match) {
+    return {frontmatter: null, content: input};
+  }
+  try {
+    const parsed = yaml.load(match[1]) as Record<string, string>;
+    return {frontmatter: parsed, content: match[2]};
+  } catch {
+    return {frontmatter: null, content: input};
+  }
+}
 
 function parseMarkdown(markdown: string): Token[] {
   return parser.parse(markdown, {});

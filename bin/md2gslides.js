@@ -29,6 +29,7 @@ const {google} = require('googleapis');
 const SlideGenerator = require('../lib/slide_generator').default;
 const {analyzeTemplate} = require('../lib/analyze_template');
 const {loadManifest} = require('../lib/layout/template_manifest');
+const {extractFrontmatter} = require('../lib/parser/parser');
 const opener = require('opener');
 
 const SCOPES = [
@@ -65,6 +66,12 @@ parser.addArgument(['-e', '--erase'], {
   dest: 'erase',
   action: 'storeTrue',
   help: 'Erase existing slides prior to appending.',
+  required: false,
+});
+parser.addArgument(['--no-erase'], {
+  dest: 'noErase',
+  action: 'storeTrue',
+  help: 'Do not erase existing slides when using a frontmatter ID (append instead).',
   required: false,
 });
 parser.addArgument(['-n', '--no-browser'], {
@@ -117,6 +124,36 @@ parser.addArgument(['--manifest'], {
 });
 
 const args = parser.parseArgs();
+
+// Read markdown file early so frontmatter can inform CLI defaults
+let markdownSource = null;
+let markdownInput = null;
+let frontmatter = null;
+let idFromFrontmatter = false;
+
+if (args.file) {
+  markdownSource = path.resolve(args.file);
+  markdownInput = fs.readFileSync(markdownSource, {encoding: 'UTF-8'});
+  const result = extractFrontmatter(markdownInput);
+  frontmatter = result.frontmatter;
+
+  if (frontmatter) {
+    // Frontmatter values are defaults; CLI flags override
+    if (!args.id && frontmatter.id) {
+      args.id = frontmatter.id;
+      idFromFrontmatter = true;
+    }
+    if (!args.title && frontmatter.title) {
+      args.title = frontmatter.title;
+    }
+    if (!args.template && frontmatter.template) {
+      args.template = frontmatter.template;
+    }
+    if (!args.manifest && frontmatter.manifest) {
+      args.manifest = frontmatter.manifest;
+    }
+  }
+}
 
 const configDir = args.project
   ? path.join(BASE_CONFIG_DIR, args.project)
@@ -213,7 +250,12 @@ function eraseIfNeeded(slideGenerator) {
     // after cloning in generateFromMarkdown()
     return Promise.resolve(slideGenerator);
   }
-  if (args.erase || !args.id) {
+  if (args.noErase) {
+    return Promise.resolve(slideGenerator);
+  }
+  // Erase when: explicit --erase, OR ID from frontmatter (iterative workflow),
+  // OR no ID at all (new presentation has placeholder slide to remove)
+  if (args.erase || idFromFrontmatter || !args.id) {
     return slideGenerator.erase().then(() => {
       return slideGenerator;
     });
@@ -235,15 +277,14 @@ function loadCss(theme) {
 }
 
 function generateSlides(slideGenerator) {
-  let source;
-  if (args.file) {
-    source = path.resolve(args.file);
-    // Set working directory relative to markdown file
-    process.chdir(path.dirname(source));
-  } else {
-    source = 0;
+  if (args.file && !markdownInput) {
+    markdownSource = path.resolve(args.file);
+    markdownInput = fs.readFileSync(markdownSource, {encoding: 'UTF-8'});
   }
-  const input = fs.readFileSync(source, {encoding: 'UTF-8'});
+  if (markdownSource) {
+    process.chdir(path.dirname(markdownSource));
+  }
+  const input = markdownInput || fs.readFileSync(0, {encoding: 'UTF-8'});
   const css = loadCss(args.style);
 
   return slideGenerator.generateFromMarkdown(input, {
@@ -252,7 +293,28 @@ function generateSlides(slideGenerator) {
   });
 }
 
+function writeFrontmatterId(id) {
+  if (!markdownSource || idFromFrontmatter || !args.file) {
+    return;
+  }
+  const raw = fs.readFileSync(markdownSource, {encoding: 'UTF-8'});
+  let updated;
+  const fmMatch = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n/);
+  if (fmMatch) {
+    // Frontmatter exists but has no id — add it
+    const fmBlock = fmMatch[1];
+    const newFmBlock = fmBlock + '\nid: ' + id;
+    updated = raw.replace(fmMatch[0], '---\n' + newFmBlock + '\n---\n');
+  } else {
+    // No frontmatter — prepend one
+    updated = '---\nid: ' + id + '\n---\n' + raw;
+  }
+  fs.writeFileSync(markdownSource, updated, {encoding: 'UTF-8'});
+  console.log('Saved presentation ID to %s', args.file);
+}
+
 function displayResults(id) {
+  writeFrontmatterId(id);
   const url = 'https://docs.google.com/presentation/d/' + id;
   if (args.headless) {
     console.log('View your presentation at: %s', url);

@@ -18,7 +18,7 @@ import Token from 'markdown-it/lib/token';
 import parse5, {Element} from 'parse5';
 import fileUrl from 'file-url';
 import {SlideDefinition, StyleDefinition} from '../slides';
-import parseMarkdown from './parser';
+import parseMarkdown, {extractFrontmatter} from './parser';
 import {Context} from './env';
 import highlightSyntax from './syntax_highlight';
 import {parseStyleSheet, parseInlineStyle, updateStyleDefinition} from './css';
@@ -556,16 +556,22 @@ fullTokenRules['generated_image'] = (token, context) => {
  * @param {string} stylesheet
  * @returns {Promise.<Array>}
  */
+export interface ExtractSlidesResult {
+  slides: SlideDefinition[];
+  frontmatter: Record<string, string> | null;
+}
+
 export default function extractSlides(
   markdown: string,
   stylesheet?: string
-): SlideDefinition[] {
-  const tokens = parseMarkdown(markdown);
+): ExtractSlidesResult {
+  const {frontmatter, content} = extractFrontmatter(markdown);
+  const tokens = parseMarkdown(content);
   const css = parseStyleSheet(stylesheet);
   const context = new Context(css);
   ruleSet = fullTokenRules; // TODO - Make not global
   processTokens(tokens, context);
   context.done();
   debug('Slides %O', context.slides);
-  return context.slides;
+  return {slides: context.slides, frontmatter};
 }

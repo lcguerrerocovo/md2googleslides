@@ -22,7 +22,7 @@ chai.use(chaiAsPromised);
 describe('extractSlides', () => {
   describe('with a title slide', () => {
     const markdown = '# Title\n' + '## Subtitle\n';
-    const slides = extractSlides(markdown);
+    const {slides} = extractSlides(markdown);
 
     it('should return a slide', () => {
       return expect(slides).to.have.length(1);
@@ -51,7 +51,7 @@ describe('extractSlides', () => {
   describe('with an empty slide', () => {
     const markdown = '---\n' + '\n';
     ('---\n');
-    const slides = extractSlides(markdown);
+    const {slides} = extractSlides(markdown);
 
     it('should return a slide', () => {
       return expect(slides).to.have.length(1);
@@ -67,7 +67,7 @@ describe('extractSlides', () => {
   });
   describe('with a title & body slide', () => {
     const markdown = '# Title\n' + 'hello world\n';
-    const slides = extractSlides(markdown);
+    const {slides} = extractSlides(markdown);
     it('should have a title', () => {
       return expect(slides).to.have.nested.property(
         '[0].title.rawText',
@@ -90,7 +90,7 @@ describe('extractSlides', () => {
   describe('with a two column slide', () => {
     const markdown =
       '# Title\n' + 'hello\n' + '\n' + '{.column}\n' + '\n' + 'world\n';
-    const slides = extractSlides(markdown);
+    const {slides} = extractSlides(markdown);
 
     it('should have a title', () => {
       return expect(slides).to.have.nested.property(
@@ -123,7 +123,7 @@ describe('extractSlides', () => {
       '# Title\n' +
       '![](https://example.com/image.jpg){.background}\n' +
       'hello world\n';
-    const slides = extractSlides(markdown);
+    const {slides} = extractSlides(markdown);
 
     it('should have a background image', () => {
       return expect(slides).to.have.nested.property(
@@ -139,7 +139,7 @@ describe('extractSlides', () => {
       '\n' +
       '![](https://example.com/image.jpg){offset-x=100 offset-y=200}\n' +
       'hello world\n';
-    const slides = extractSlides(markdown);
+    const {slides} = extractSlides(markdown);
 
     it('should have a background image', () => {
       return expect(slides).to.have.nested.property(
@@ -166,7 +166,7 @@ describe('extractSlides', () => {
   describe('with video', () => {
     const markdown =
       '# Title\n' + '\n' + '@[youtube](12345)\n' + 'hello world\n';
-    const slides = extractSlides(markdown);
+    const {slides} = extractSlides(markdown);
 
     it('should have a video', () => {
       return expect(slides).to.have.nested.property(
@@ -187,7 +187,7 @@ describe('extractSlides', () => {
       ' e | f\n' +
       '\n';
 
-    const slides = extractSlides(markdown);
+    const {slides} = extractSlides(markdown);
 
     it('should have a table', () => {
       return expect(slides).to.have.nested.property('[0].tables').length(1);
@@ -209,7 +209,7 @@ describe('extractSlides', () => {
   describe('with unordered lists', () => {
     const markdown = '# Title\n' + '* item 1\n' + '* item 2\n';
 
-    const slides = extractSlides(markdown);
+    const {slides} = extractSlides(markdown);
 
     it('should have list markers', () => {
       return expect(slides)
@@ -242,7 +242,7 @@ describe('extractSlides', () => {
   describe('with ordered lists', () => {
     const markdown = '# Title\n' + '1. item 1\n' + '1. item 2\n';
 
-    const slides = extractSlides(markdown);
+    const {slides} = extractSlides(markdown);
 
     it('should have list markers', () => {
       return expect(slides)
@@ -275,7 +275,7 @@ describe('extractSlides', () => {
   describe('with text formats', () => {
     const markdown = '*italic*, **bold**, ~~strikethrough~~\n';
 
-    const slides = extractSlides(markdown);
+    const {slides} = extractSlides(markdown);
 
     it('should have text runs', () => {
       return expect(slides)
@@ -350,7 +350,7 @@ describe('extractSlides', () => {
   describe('with emoji', () => {
     const markdown = ':heart:\n';
 
-    const slides = extractSlides(markdown);
+    const {slides} = extractSlides(markdown);
 
     it('should have emoji', () => {
       return expect(slides).to.have.nested.property(
@@ -363,7 +363,7 @@ describe('extractSlides', () => {
   describe('with markdown attributes', () => {
     const markdown = '*hello*{style="color: #EFEFEF; font-size: 5pt"}\n';
 
-    const slides = extractSlides(markdown);
+    const {slides} = extractSlides(markdown);
 
     it('should have text runs', () => {
       return expect(slides)
@@ -402,7 +402,7 @@ describe('extractSlides', () => {
     const markdown =
       '<span style="color: #EFEFEF; font-size: 5pt">hello</span>\n';
 
-    const slides = extractSlides(markdown);
+    const {slides} = extractSlides(markdown);
 
     it('should have text runs', () => {
       return expect(slides)
@@ -440,7 +440,7 @@ describe('extractSlides', () => {
   describe('with inline HTML subscript', () => {
     const markdown = 'H<sub>2</sub>O\n';
 
-    const slides = extractSlides(markdown);
+    const {slides} = extractSlides(markdown);
 
     it('should have text runs', () => {
       return expect(slides)
@@ -473,7 +473,7 @@ describe('extractSlides', () => {
   describe('with inline HTML superscript', () => {
     const markdown = 'Hello<sup>1</sup>\n';
 
-    const slides = extractSlides(markdown);
+    const {slides} = extractSlides(markdown);
 
     it('should have text runs', () => {
       return expect(slides)
@@ -512,7 +512,7 @@ describe('extractSlides', () => {
       '* one\n' +
       '* two\n' +
       '-->\n';
-    const slides = extractSlides(markdown);
+    const {slides} = extractSlides(markdown);
 
     it('should have speaker notes', () => {
       return expect(slides).to.have.nested.property(
@@ -536,7 +536,7 @@ describe('extractSlides', () => {
 
   describe('with a custom layout', () => {
     const markdown = '{layout="my custom layout"}\n' + '# Title\n';
-    const slides = extractSlides(markdown);
+    const {slides} = extractSlides(markdown);
 
     it('should have a customLayout', () => {
       return expect(slides).to.have.nested.property(

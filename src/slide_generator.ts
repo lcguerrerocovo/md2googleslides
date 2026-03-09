@@ -195,7 +195,7 @@ export default class SlideGenerator {
     {css, useFileio}: {css: string; useFileio: boolean}
   ): Promise<string> {
     assert(this.presentation?.presentationId);
-    this.slides = extractSlides(markdown, css);
+    this.slides = extractSlides(markdown, css).slides;
     this.validateTemplateSlides();
     this.allowUpload = useFileio;
     await this.generateImages();
