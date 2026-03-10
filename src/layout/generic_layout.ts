@@ -275,6 +275,22 @@ export default class GenericLayout {
     );
   }
 
+  private hasTextContent(objectId: string): boolean {
+    if (!this.presentation.slides) {
+      return false;
+    }
+    for (const slide of this.presentation.slides) {
+      for (const el of slide.pageElements ?? []) {
+        if (el.objectId === objectId && el.shape?.text?.textElements) {
+          return el.shape.text.textElements.some(
+            te => te.textRun?.content && te.textRun.content.trim().length > 0
+          );
+        }
+      }
+    }
+    return false;
+  }
+
   protected appendInsertTextRequests(
     text: TextDefinition,
     locationProps:
@@ -284,12 +300,14 @@ export default class GenericLayout {
   ): void {
     // Clear existing placeholder text on cloned template slides
     if (this.slide.templateSlide !== undefined && locationProps.objectId) {
-      requests.push({
-        deleteText: {
-          objectId: locationProps.objectId,
-          textRange: {type: 'FROM_START_TO_END'},
-        },
-      });
+      if (this.hasTextContent(locationProps.objectId)) {
+        requests.push({
+          deleteText: {
+            objectId: locationProps.objectId,
+            textRange: {type: 'ALL'},
+          },
+        });
+      }
     }
 
     // Insert the raw text first
