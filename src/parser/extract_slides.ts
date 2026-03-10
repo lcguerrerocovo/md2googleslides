@@ -17,7 +17,8 @@ import extend from 'extend';
 import Token from 'markdown-it/lib/token';
 import parse5, {Element} from 'parse5';
 import fileUrl from 'file-url';
-import {SlideDefinition, StyleDefinition} from '../slides';
+import path from 'path';
+import {ImageDefinition, SlideDefinition, StyleDefinition} from '../slides';
 import parseMarkdown, {extractFrontmatter} from './parser';
 import {Context} from './env';
 import highlightSyntax from './syntax_highlight';
@@ -400,6 +401,56 @@ fullTokenRules['hr'] = (token, context) => {
 fullTokenRules['image'] = (token, context) => {
   assert(context.currentSlide);
   let url = attr(token, 'src');
+  const isD2 = url && url.endsWith('.d2');
+
+  if (isD2) {
+    const resolved = path.isAbsolute(url!)
+      ? url!
+      : path.resolve(process.cwd(), url!);
+    const styleParts: string[] = [];
+    const theme = attr(token, 'theme');
+    if (theme) {
+      styleParts.push(`theme=${theme}`);
+    }
+    const layout = attr(token, 'd2-layout');
+    if (layout) {
+      styleParts.push(`layout=${layout}`);
+    }
+    const image: ImageDefinition = {
+      url: undefined,
+      source: resolved,
+      type: 'd2',
+      style: styleParts.length ? styleParts.join(';') : undefined,
+      width: 0,
+      height: 0,
+      padding: 0,
+      offsetX: 0,
+      offsetY: 0,
+    };
+
+    const padding = attr(token, 'pad');
+    if (padding) {
+      image.padding = parseInt(padding);
+    }
+
+    const offsetX = attr(token, 'offset-x');
+    if (offsetX) {
+      image.offsetX = parseInt(offsetX);
+    }
+
+    const offsetY = attr(token, 'offset-y');
+    if (offsetY) {
+      image.offsetY = parseInt(offsetY);
+    }
+
+    if (hasClass(token, 'background')) {
+      context.currentSlide.backgroundImage = image;
+    } else {
+      context.images.push(image);
+    }
+    return;
+  }
+
   if (url && !url.match(/(file|https?):/)) {
     url = fileUrl(url);
   }
