@@ -22,11 +22,15 @@ export function loadManifest(filePath: string): TemplateManifest {
   const content = fs.readFileSync(filePath, 'utf-8');
   const data = yaml.load(content) as TemplateManifest;
   if (!data || typeof data.slides !== 'object') {
-    throw new Error(`Invalid manifest: missing or invalid "slides" key in ${filePath}`);
+    throw new Error(
+      `Invalid manifest: missing or invalid "slides" key in ${filePath}`
+    );
   }
   for (const [slideNum, slideDef] of Object.entries(data.slides)) {
     if (!slideDef) {
-      throw new Error(`Invalid manifest: slide ${slideNum} is empty in ${filePath}`);
+      throw new Error(
+        `Invalid manifest: slide ${slideNum} is empty in ${filePath}`
+      );
     }
     if (slideDef.slots) {
       for (const [slotName, slotDef] of Object.entries(slideDef.slots)) {

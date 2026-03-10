@@ -16,7 +16,10 @@ import Debug from 'debug';
 import extractSlides from './parser/extract_slides';
 import {SlideDefinition, ImageDefinition} from './slides';
 import matchLayout from './layout/match_layout';
-import {TemplateManifest, resolveSlideNameToNumber} from './layout/template_manifest';
+import {
+  TemplateManifest,
+  resolveSlideNameToNumber,
+} from './layout/template_manifest';
 import {uuid} from './utils';
 import {URL} from 'url';
 import {google, slides_v1 as SlidesV1} from 'googleapis';
@@ -267,9 +270,7 @@ export default class SlideGenerator {
           );
         }
         if (this.templateSlideIds.length === 0) {
-          throw new Error(
-            '{template_slide=N} requires --template flag'
-          );
+          throw new Error('{template_slide=N} requires --template flag');
         }
         if (
           slide.templateSlide < 1 ||
@@ -426,11 +427,7 @@ export default class SlideGenerator {
       requests: [],
     };
     for (const slide of this.slides) {
-      const layout = matchLayout(
-        this.presentation,
-        slide,
-        this.masterObjectId
-      );
+      const layout = matchLayout(this.presentation, slide, this.masterObjectId);
       layout.appendCreateSlideRequest(batch.requests!);
     }
     return batch;

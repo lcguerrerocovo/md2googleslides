@@ -138,9 +138,7 @@ export default class GenericLayout {
         const bodySlots = [
           slideDef.slots.body ?? slideDef.slots.body_0,
           slideDef.slots.body_1,
-        ].filter(
-          (s): s is ManifestSlotDef => s !== undefined && s !== null
-        );
+        ].filter((s): s is ManifestSlotDef => s !== undefined && s !== null);
         for (
           let i = 0;
           i < Math.min(bodySlots.length, this.slide.bodies.length);
@@ -289,7 +287,7 @@ export default class GenericLayout {
       requests.push({
         deleteText: {
           objectId: locationProps.objectId,
-          textRange: {type: 'ALL'},
+          textRange: {type: 'FROM_START_TO_END'},
         },
       });
     }

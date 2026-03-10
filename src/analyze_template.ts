@@ -49,9 +49,7 @@ function generateSlideName(textBoxes: TextBoxInfo[]): string {
   if (textBoxes.length === 0) return 'Empty slide';
 
   // Sort by font size descending to find the "title" text
-  const sorted = [...textBoxes].sort(
-    (a, b) => b.font_size_pt - a.font_size_pt
-  );
+  const sorted = [...textBoxes].sort((a, b) => b.font_size_pt - a.font_size_pt);
   const titleText = sorted[0].text_content;
 
   if (!titleText) return 'Untitled slide';
@@ -69,9 +67,7 @@ function classifySlots(textBoxes: TextBoxInfo[]): SlotAssignment[] {
   if (textBoxes.length === 0) return [];
 
   // Sort by font size descending
-  const sorted = [...textBoxes].sort(
-    (a, b) => b.font_size_pt - a.font_size_pt
-  );
+  const sorted = [...textBoxes].sort((a, b) => b.font_size_pt - a.font_size_pt);
 
   const assignments: SlotAssignment[] = [];
 
@@ -81,11 +77,17 @@ function classifySlots(textBoxes: TextBoxInfo[]): SlotAssignment[] {
   if (sorted.length === 2) {
     // Exactly 2 text boxes: assign second as both subtitle AND body.
     // This way both ## (subtitle) and paragraph text (body) work.
-    assignments.push({role: 'subtitle', element_index: sorted[1].element_index});
+    assignments.push({
+      role: 'subtitle',
+      element_index: sorted[1].element_index,
+    });
     assignments.push({role: 'body', element_index: sorted[1].element_index});
   } else if (sorted.length >= 3) {
     // 3+ text boxes: second is subtitle, third is body, rest are body_N
-    assignments.push({role: 'subtitle', element_index: sorted[1].element_index});
+    assignments.push({
+      role: 'subtitle',
+      element_index: sorted[1].element_index,
+    });
     assignments.push({role: 'body', element_index: sorted[2].element_index});
     for (let i = 3; i < sorted.length; i++) {
       assignments.push({

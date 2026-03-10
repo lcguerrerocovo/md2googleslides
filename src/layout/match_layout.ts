@@ -55,7 +55,13 @@ export default function matchLayout(
     }
     layoutName = layout.name;
   }
-  return new GenericLayout(layoutName, presentation, slide, masterObjectId, manifest);
+  return new GenericLayout(
+    layoutName,
+    presentation,
+    slide,
+    masterObjectId,
+    manifest
+  );
 }
 
 function defineLayout(name: string, matchFn: MatchFn): void {

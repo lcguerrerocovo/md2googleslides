@@ -49,6 +49,63 @@ deck, just get the ID of the already generated slides. For example, you can use 
 md2gslides slides.md --title "Talk Title" --append <some id> --erase
 ```
 
+## Frontmatter workflow
+
+Instead of passing CLI flags, you can use YAML frontmatter in your markdown file. This is the recommended workflow for iterating on a deck.
+
+### Frontmatter keys
+
+| Key | Description |
+|-----|-------------|
+| `id` | Google Slides presentation ID (written back automatically after first run) |
+| `title` | Presentation title |
+| `template` | Template presentation ID to clone slides from |
+| `manifest` | Path to YAML manifest file for template content filling |
+
+### Example
+
+<pre>
+---
+title: My Presentation
+template: 1qBgj4pWhorq3Eoy1y6azLKGjBQXnU7tTtWV3W_tKY_o
+manifest: dp-template-manifest.yaml
+---
+
+{template_slide="Title slide"}
+
+# Welcome
+## Getting started
+
+---
+
+{template_slide="Content slide"}
+
+# Agenda
+
+* Item one
+* Item two
+</pre>
+
+### How it works
+
+**First run:** Creates the deck (copying the template if specified), then writes the presentation `id` back into the markdown file's frontmatter. No CLI flags needed:
+
+```sh
+md2gslides slides.md
+```
+
+**Subsequent runs:** The same command updates the deck in place. For non-template decks, slides are erased and regenerated at the same URL. For template decks, a fresh copy is created from the template, the old deck is deleted, and the new ID is written back to the frontmatter.
+
+### Name-based template slides
+
+When using a manifest, you can reference template slides by name instead of number:
+
+```
+{template_slide="Title slide"}
+```
+
+The name is resolved via the manifest's `name` field for each slide entry. Run `--analyze-template` to generate a manifest with auto-assigned names.
+
 ## Template integration
 
 Use `--template <ID>` to copy a Google Slides template and clone specific slides from it. This preserves all visual branding (backgrounds, shapes, logos, colors) from the template.

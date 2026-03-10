@@ -338,7 +338,11 @@ async function deletePreviousDeck() {
     await drive.files.delete({fileId: previousDeckId});
     console.log('Deleted previous deck %s', previousDeckId);
   } catch (err) {
-    console.warn('Could not delete previous deck %s: %s', previousDeckId, err.message);
+    console.warn(
+      'Could not delete previous deck %s: %s',
+      previousDeckId,
+      err.message
+    );
   }
 }
 
