@@ -154,6 +154,9 @@ if (args.file) {
     if (!args.manifest && frontmatter.manifest) {
       args.manifest = frontmatter.manifest;
     }
+    if (!args.useFileio && frontmatter.use_fileio) {
+      args.useFileio = true;
+    }
     // When template is active, it creates a fresh deck each run.
     // Don't set id — it would conflict with template mode.
     // Track old ID so we can delete the previous deck after the new one is created.
@@ -373,7 +376,8 @@ if (args.analyzeTemplate) {
     .then(buildSlideGenerator)
     .then(slideGenerator => {
       if (args.manifest) {
-        const manifestPath = path.resolve(args.manifest);
+        const manifestBase = markdownSource ? path.dirname(markdownSource) : process.cwd();
+        const manifestPath = path.resolve(manifestBase, args.manifest);
         const manifest = loadManifest(manifestPath);
         slideGenerator.setManifest(manifest);
       }

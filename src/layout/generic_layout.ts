@@ -166,6 +166,16 @@ export default class GenericLayout {
           slideDef.slots.body ?? slideDef.slots.body_0,
           slideDef.slots.body_1,
         ].filter((s): s is ManifestSlotDef => s !== undefined && s !== null);
+
+        // If this slide has images or tables, clear decorative shapes from
+        // the image area so they don't overlap with the new content
+        const hasImages = this.slide.bodies.some(b => b.images?.length);
+        const hasTables = this.slide.tables.length > 0;
+        if (hasImages || hasTables) {
+          const imageArea = this.resolveImageArea(slideDef, usedSlotElements);
+          this.deleteDecorativeShapesInImageArea(slideDef, imageArea, requests);
+        }
+
         for (
           let i = 0;
           i < Math.min(bodySlots.length, this.slide.bodies.length);
@@ -313,6 +323,52 @@ export default class GenericLayout {
       value,
       {objectId: placeholder.objectId},
       requests
+    );
+  }
+
+  private deleteDecorativeShapesInImageArea(
+    slideDef: {slots?: Record<string, ManifestSlotDef>},
+    imageArea: BoundingBox,
+    requests: SlidesV1.Schema$Request[]
+  ): void {
+    assert(this.slide.objectId);
+    const page = findPage(this.presentation, this.slide.objectId);
+    if (!page?.pageElements) {
+      return;
+    }
+    const usedIndices = new Set<number>();
+    if (slideDef.slots) {
+      for (const slotDef of Object.values(slideDef.slots)) {
+        usedIndices.add(slotDef.element_index);
+      }
+    }
+    for (let idx = 0; idx < page.pageElements.length; idx++) {
+      if (usedIndices.has(idx)) {
+        continue;
+      }
+      const el = page.pageElements[idx];
+      if (
+        !el.objectId ||
+        !el.size?.width?.magnitude ||
+        !el.size?.height?.magnitude
+      ) {
+        continue;
+      }
+      const elBox = this.calculateBoundingBox(el);
+      if (this.boxesOverlap(elBox, imageArea)) {
+        requests.push({
+          deleteObject: {objectId: el.objectId},
+        });
+      }
+    }
+  }
+
+  private boxesOverlap(a: BoundingBox, b: BoundingBox): boolean {
+    return (
+      a.x < b.x + b.width &&
+      a.x + a.width > b.x &&
+      a.y < b.y + b.height &&
+      a.y + a.height > b.y
     );
   }
 
