@@ -192,10 +192,11 @@ export default class GenericLayout {
             );
           }
         }
-      }
-      // Tables in template slides
-      if (this.slide.tables.length) {
-        this.appendCreateTableRequests(this.slide.tables, requests);
+        // Tables in template slides — position within body area
+        if (this.slide.tables.length) {
+          const tableBox = this.computeImageArea(usedSlotElements);
+          this.appendCreateTableRequests(this.slide.tables, requests, tableBox);
+        }
       }
       // Background image
       if (this.slide.backgroundImage) {
@@ -623,7 +624,8 @@ export default class GenericLayout {
 
   protected appendCreateTableRequests(
     tables: TableDefinition[],
-    requests: SlidesV1.Schema$Request[]
+    requests: SlidesV1.Schema$Request[],
+    constraintBox?: BoundingBox
   ): void {
     if (tables.length > 1) {
       throw new Error('Multiple tables per slide are not supported.');
@@ -631,13 +633,30 @@ export default class GenericLayout {
     const table = tables[0];
     const tableId = uuid();
 
+    const elementProperties: SlidesV1.Schema$PageElementProperties = {
+      pageObjectId: this.slide.objectId,
+    };
+
+    if (constraintBox && constraintBox.width > 0 && constraintBox.height > 0) {
+      elementProperties.size = {
+        width: {magnitude: constraintBox.width, unit: 'EMU'},
+        height: {magnitude: constraintBox.height, unit: 'EMU'},
+      };
+      elementProperties.transform = {
+        scaleX: 1,
+        scaleY: 1,
+        translateX: constraintBox.x,
+        translateY: constraintBox.y,
+        shearX: 0,
+        shearY: 0,
+        unit: 'EMU',
+      };
+    }
+
     requests.push({
       createTable: {
         objectId: tableId,
-        elementProperties: {
-          pageObjectId: this.slide.objectId,
-          // Use default size/transform for tables
-        },
+        elementProperties,
         rows: table.rows,
         columns: table.columns,
       },
