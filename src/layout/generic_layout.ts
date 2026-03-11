@@ -350,6 +350,26 @@ export default class GenericLayout {
     }
   }
 
+  private extractBaseTextStyle(
+    objectId: string
+  ): SlidesV1.Schema$TextStyle | undefined {
+    if (!this.presentation.slides) {
+      return undefined;
+    }
+    for (const slide of this.presentation.slides) {
+      for (const el of slide.pageElements ?? []) {
+        if (el.objectId === objectId && el.shape?.text?.textElements) {
+          for (const te of el.shape.text.textElements) {
+            if (te.textRun?.style) {
+              return {...te.textRun.style};
+            }
+          }
+        }
+      }
+    }
+    return undefined;
+  }
+
   private hasTextContent(objectId: string): boolean {
     if (!this.presentation.slides) {
       return false;
@@ -395,6 +415,33 @@ export default class GenericLayout {
       ),
     };
     requests.push(request);
+
+    // Apply template base text style to preserve branded typography
+    if (this.slide.templateSlide !== undefined && locationProps.objectId) {
+      const baseStyle = this.extractBaseTextStyle(locationProps.objectId);
+      if (baseStyle) {
+        // Remove content and link fields — only keep visual styling
+        delete baseStyle.link;
+        delete baseStyle.weightedFontFamily;
+        const baseFields = this.computeShallowFieldMask(baseStyle);
+        if (baseFields.length) {
+          requests.push({
+            updateTextStyle: extend(
+              {
+                textRange: {
+                  type: 'FIXED_RANGE',
+                  startIndex: 0,
+                  endIndex: text.rawText.length,
+                },
+                style: baseStyle,
+                fields: baseFields,
+              },
+              locationProps
+            ),
+          });
+        }
+      }
+    }
 
     // Apply any text styles present.
     // Most of the work for generating the text runs
