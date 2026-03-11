@@ -14,7 +14,8 @@ async function renderD2(image: ImageDefinition): Promise<string> {
   const inputPath = image.source;
   const outputPath = await tmp.tmpName({postfix: '.png'});
 
-  const args = ['--scale', '2'];
+  const args: string[] = [];
+  let hasScale = false;
 
   if (image.style) {
     const parts = image.style.split(';');
@@ -24,8 +25,14 @@ async function renderD2(image: ImageDefinition): Promise<string> {
         args.push('--theme', value);
       } else if (key === 'layout' && value) {
         args.push('--layout', value);
+      } else if (key === 'scale' && value) {
+        args.push('--scale', value);
+        hasScale = true;
       }
     }
+  }
+  if (!hasScale) {
+    args.push('--scale', '1');
   }
 
   args.push(inputPath, outputPath);

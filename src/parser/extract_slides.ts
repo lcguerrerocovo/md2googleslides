@@ -416,6 +416,10 @@ fullTokenRules['image'] = (token, context) => {
     if (layout) {
       styleParts.push(`layout=${layout}`);
     }
+    const scale = attr(token, 'd2-scale');
+    if (scale) {
+      styleParts.push(`scale=${scale}`);
+    }
     const image: ImageDefinition = {
       url: undefined,
       source: resolved,
@@ -548,8 +552,8 @@ fullTokenRules['td_open'] = (token, context) => {
       },
     },
   });
-  context.startStyle(style);
   context.startTextBlock();
+  context.startStyle(style);
 };
 
 fullTokenRules['th_open'] = (token, context) => {
@@ -564,8 +568,8 @@ fullTokenRules['th_open'] = (token, context) => {
       },
     },
   });
-  context.startStyle(style);
   context.startTextBlock();
+  context.startStyle(style);
 };
 
 fullTokenRules['td_close'] = fullTokenRules['th_close'] = (token, context) => {

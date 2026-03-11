@@ -57,6 +57,7 @@ export default class SlideGenerator {
   private templateSlideIds: string[] = [];
   private masterObjectId?: string;
   private manifest?: TemplateManifest;
+  private oauth2Client?: OAuth2Client;
   /**
    * @param {Object} api Authorized API client instance
    * @param {Object} presentation Initial presentation data
@@ -92,7 +93,9 @@ export default class SlideGenerator {
       },
     });
     const presentation = res.data;
-    return new SlideGenerator(api, presentation);
+    const generator = new SlideGenerator(api, presentation);
+    generator.oauth2Client = oauth2Client;
+    return generator;
   }
 
   /**
@@ -182,7 +185,9 @@ export default class SlideGenerator {
     const api = google.slides({version: 'v1', auth: oauth2Client});
     const res = await api.presentations.get({presentationId: presentationId});
     const presentation = res.data;
-    return new SlideGenerator(api, presentation);
+    const generator = new SlideGenerator(api, presentation);
+    generator.oauth2Client = oauth2Client;
+    return generator;
   }
 
   /**
@@ -349,7 +354,8 @@ export default class SlideGenerator {
       if (!this.allowUpload) {
         return Promise.reject('Local images require --use-fileio option');
       }
-      image.url = await uploadLocalImage(parsedUrl.pathname);
+      assert(this.oauth2Client, 'OAuth2 client required for image upload');
+      image.url = await uploadLocalImage(this.oauth2Client, parsedUrl.pathname);
     };
     return this.processImages(uploadImageifLocal);
   }

@@ -28,12 +28,14 @@ import {
 } from '../slides';
 import {
   findLayoutIdByName,
+  findPage,
   findPlaceholder,
   findSpeakerNotesObjectId,
 } from './presentation_helpers';
 import {
   ManifestSlotDef,
   TemplateManifest,
+  resolveSlotElement,
   resolveSlotObjectId,
 } from './template_manifest';
 import assert from 'assert';
@@ -104,6 +106,30 @@ export default class GenericLayout {
       const slideDef = this.manifest.slides[this.slide.templateSlide as number];
       if (slideDef && slideDef.slots) {
         assert(this.slide.objectId);
+        // Clear all text boxes on the cloned slide to remove placeholder text
+        // This must happen before any insertText requests since those rely
+        // on the hasTextContent guard to avoid double-clearing
+        this.clearUnusedTextBoxes(slideDef, requests);
+        // Collect all slot elements used for text so images can be placed
+        // in the remaining free area of the slide
+        const usedSlotElements: SlidesV1.Schema$PageElement[] = [];
+        for (const slotKey of [
+          'title',
+          'subtitle',
+          'body',
+          'body_0',
+          'body_1',
+        ]) {
+          const slotDef = slideDef.slots[slotKey];
+          if (slotDef) {
+            const el = resolveSlotElement(
+              this.presentation,
+              this.slide.objectId,
+              slotDef
+            );
+            if (el) usedSlotElements.push(el);
+          }
+        }
         // Title
         if (this.slide.title && slideDef.slots.title) {
           const objectId = resolveSlotObjectId(
@@ -156,7 +182,20 @@ export default class GenericLayout {
               requests
             );
           }
+          // Images in template body — place in free slide area, not the text box
+          if (this.slide.bodies[i].images?.length) {
+            const imageBox = this.computeImageArea(usedSlotElements);
+            this.appendCreateImageRequests(
+              this.slide.bodies[i].images,
+              imageBox,
+              requests
+            );
+          }
         }
+      }
+      // Tables in template slides
+      if (this.slide.tables.length) {
+        this.appendCreateTableRequests(this.slide.tables, requests);
       }
       // Background image
       if (this.slide.backgroundImage) {
@@ -273,6 +312,41 @@ export default class GenericLayout {
       {objectId: placeholder.objectId},
       requests
     );
+  }
+
+  private clearUnusedTextBoxes(
+    slideDef: {slots?: Record<string, ManifestSlotDef>},
+    requests: SlidesV1.Schema$Request[]
+  ): void {
+    assert(this.slide.objectId);
+    const page = findPage(this.presentation, this.slide.objectId);
+    if (!page?.pageElements) {
+      return;
+    }
+    // Collect ALL element indices mapped to manifest slots — never clear these
+    const usedIndices = new Set<number>();
+    if (slideDef.slots) {
+      for (const slotDef of Object.values(slideDef.slots)) {
+        usedIndices.add(slotDef.element_index);
+      }
+    }
+    // Clear text in all text boxes NOT mapped to used slots
+    for (let idx = 0; idx < page.pageElements.length; idx++) {
+      if (usedIndices.has(idx)) {
+        continue;
+      }
+      const el = page.pageElements[idx];
+      if (el.shape?.text?.textElements && el.objectId) {
+        if (this.hasTextContent(el.objectId)) {
+          requests.push({
+            deleteText: {
+              objectId: el.objectId,
+              textRange: {type: 'ALL'},
+            },
+          });
+        }
+      }
+    }
   }
 
   private hasTextContent(objectId: string): boolean {
@@ -412,7 +486,7 @@ export default class GenericLayout {
 
   protected appendCreateImageRequests(
     images: ImageDefinition[],
-    placeholder: SlidesV1.Schema$PageElement | undefined,
+    placeholderOrBox: SlidesV1.Schema$PageElement | BoundingBox | undefined,
     requests: SlidesV1.Schema$Request[]
   ): void {
     // TODO - Fix weird cast
@@ -426,7 +500,7 @@ export default class GenericLayout {
       });
     }
 
-    const box = this.getBodyBoundingBox(placeholder);
+    const box = this.resolveImageBox(placeholderOrBox);
     const computedLayout = layer.export();
 
     const scaleRatio = Math.min(
@@ -622,6 +696,89 @@ export default class GenericLayout {
       x: 0,
       y: 0,
     };
+  }
+
+  /**
+   * Resolves image placement box from either a pre-computed BoundingBox,
+   * a page element, or falls back to full page size.
+   */
+  private resolveImageBox(
+    placeholderOrBox: SlidesV1.Schema$PageElement | BoundingBox | undefined
+  ): BoundingBox {
+    if (!placeholderOrBox) {
+      return this.getBodyBoundingBox(undefined);
+    }
+    // Already a BoundingBox
+    if (
+      'x' in placeholderOrBox &&
+      'width' in placeholderOrBox &&
+      !('objectId' in placeholderOrBox)
+    ) {
+      return placeholderOrBox as BoundingBox;
+    }
+    return this.getBodyBoundingBox(
+      placeholderOrBox as SlidesV1.Schema$PageElement
+    );
+  }
+
+  /**
+   * Computes the free area on a template slide not occupied by used slot
+   * elements. Picks the larger of the space to the right of all slots
+   * or the space below all slots.
+   */
+  protected computeImageArea(
+    usedElements: SlidesV1.Schema$PageElement[]
+  ): BoundingBox {
+    assert(this.presentation.pageSize?.width?.magnitude);
+    assert(this.presentation.pageSize?.height?.magnitude);
+
+    const pageWidth = this.presentation.pageSize.width.magnitude;
+    const pageHeight = this.presentation.pageSize.height.magnitude;
+
+    if (usedElements.length === 0) {
+      return {width: pageWidth, height: pageHeight, x: 0, y: 0};
+    }
+
+    let maxRight = 0;
+    let maxBottom = 0;
+    let minLeft = pageWidth;
+    let minTop = pageHeight;
+
+    for (const el of usedElements) {
+      const box = this.calculateBoundingBox(el);
+      maxRight = Math.max(maxRight, box.x + box.width);
+      maxBottom = Math.max(maxBottom, box.y + box.height);
+      minLeft = Math.min(minLeft, box.x);
+      minTop = Math.min(minTop, box.y);
+    }
+
+    // Use the left margin of the text elements as spacing
+    const gap = minLeft;
+
+    const rightArea: BoundingBox = {
+      x: maxRight + gap,
+      y: minTop,
+      width: pageWidth - maxRight - gap - minLeft,
+      height: pageHeight - minTop - gap,
+    };
+
+    const bottomArea: BoundingBox = {
+      x: minLeft,
+      y: maxBottom + gap,
+      width: pageWidth - minLeft * 2,
+      height: pageHeight - maxBottom - gap - minLeft,
+    };
+
+    const rightSize = rightArea.width * rightArea.height;
+    const bottomSize = bottomArea.width * bottomArea.height;
+
+    if (rightSize > 0 && rightSize >= bottomSize) {
+      return rightArea;
+    }
+    if (bottomSize > 0) {
+      return bottomArea;
+    }
+    return {width: pageWidth, height: pageHeight, x: 0, y: 0};
   }
 
   protected computeShallowFieldMask<T>(object: T): string {

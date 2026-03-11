@@ -76,3 +76,15 @@ export function resolveSlotObjectId(
   const element = page.pageElements[slotDef.element_index];
   return element?.objectId ?? undefined;
 }
+
+export function resolveSlotElement(
+  presentation: SlidesV1.Schema$Presentation,
+  slideObjectId: string,
+  slotDef: ManifestSlotDef
+): SlidesV1.Schema$PageElement | undefined {
+  const page = findPage(presentation, slideObjectId);
+  if (!page || !page.pageElements) {
+    return undefined;
+  }
+  return page.pageElements[slotDef.element_index];
+}
