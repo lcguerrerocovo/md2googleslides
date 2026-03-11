@@ -110,7 +110,23 @@ export default class GenericLayout {
         // Clear all text boxes on the cloned slide to remove placeholder text
         // This must happen before any insertText requests since those rely
         // on the hasTextContent guard to avoid double-clearing
-        this.clearUnusedTextBoxes(slideDef, requests);
+        const filledSlotKeys = new Set<string>();
+        if (this.slide.title && slideDef.slots.title) {
+          filledSlotKeys.add('title');
+        }
+        if (this.slide.subtitle && slideDef.slots.subtitle) {
+          filledSlotKeys.add('subtitle');
+        }
+        for (let i = 0; i < this.slide.bodies.length; i++) {
+          if (this.slide.bodies[i].text) {
+            const key =
+              i === 0 ? (slideDef.slots.body ? 'body' : 'body_0') : `body_${i}`;
+            if (slideDef.slots[key]) {
+              filledSlotKeys.add(key);
+            }
+          }
+        }
+        this.clearUnusedTextBoxes(slideDef, filledSlotKeys, requests);
         // Collect all slot elements used for text so images can be placed
         // in the remaining free area of the slide
         const usedSlotElements: SlidesV1.Schema$PageElement[] = [];
@@ -374,6 +390,7 @@ export default class GenericLayout {
 
   private clearUnusedTextBoxes(
     slideDef: {slots?: Record<string, ManifestSlotDef>},
+    filledSlotKeys: Set<string>,
     requests: SlidesV1.Schema$Request[]
   ): void {
     assert(this.slide.objectId);
@@ -381,16 +398,18 @@ export default class GenericLayout {
     if (!page?.pageElements) {
       return;
     }
-    // Collect ALL element indices mapped to manifest slots — never clear these
-    const usedIndices = new Set<number>();
+    // Only protect slots that will actually receive content from the markdown
+    const filledIndices = new Set<number>();
     if (slideDef.slots) {
-      for (const slotDef of Object.values(slideDef.slots)) {
-        usedIndices.add(slotDef.element_index);
+      for (const [key, slotDef] of Object.entries(slideDef.slots)) {
+        if (filledSlotKeys.has(key)) {
+          filledIndices.add(slotDef.element_index);
+        }
       }
     }
-    // Clear text in all text boxes NOT mapped to used slots
+    // Clear text in all text boxes not being filled with content
     for (let idx = 0; idx < page.pageElements.length; idx++) {
-      if (usedIndices.has(idx)) {
+      if (filledIndices.has(idx)) {
         continue;
       }
       const el = page.pageElements[idx];
