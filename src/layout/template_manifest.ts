@@ -7,10 +7,18 @@ export interface ManifestSlotDef {
   element_index: number;
 }
 
+export interface ManifestImageArea {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
 export interface ManifestSlideDef {
   name?: string;
   preview?: string;
   slots?: Record<string, ManifestSlotDef>;
+  image_area?: ManifestImageArea;
 }
 
 export interface TemplateManifest {

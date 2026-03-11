@@ -100,6 +100,57 @@ function classifySlots(textBoxes: TextBoxInfo[]): SlotAssignment[] {
   return assignments;
 }
 
+function computeImageAreaFromTextBoxes(
+  textBoxes: TextBoxInfo[],
+  pageWidth: number,
+  pageHeight: number
+): {x: number; y: number; width: number; height: number} | null {
+  if (textBoxes.length === 0) {
+    return null;
+  }
+
+  let maxRight = 0;
+  let maxBottom = 0;
+  let minLeft = pageWidth;
+  let minTop = pageHeight;
+
+  for (const tb of textBoxes) {
+    const right = tb.position.translateX + tb.size.width;
+    const bottom = tb.position.translateY + tb.size.height;
+    maxRight = Math.max(maxRight, right);
+    maxBottom = Math.max(maxBottom, bottom);
+    minLeft = Math.min(minLeft, tb.position.translateX);
+    minTop = Math.min(minTop, tb.position.translateY);
+  }
+
+  const gap = minLeft;
+
+  const rightArea = {
+    x: maxRight + gap,
+    y: minTop,
+    width: pageWidth - maxRight - gap - minLeft,
+    height: pageHeight - minTop - gap,
+  };
+
+  const bottomArea = {
+    x: minLeft,
+    y: maxBottom + gap,
+    width: pageWidth - minLeft * 2,
+    height: pageHeight - maxBottom - gap - minLeft,
+  };
+
+  const rightSize = rightArea.width * rightArea.height;
+  const bottomSize = bottomArea.width * bottomArea.height;
+
+  if (rightSize > 0 && rightSize >= bottomSize) {
+    return rightArea;
+  }
+  if (bottomSize > 0) {
+    return bottomArea;
+  }
+  return null;
+}
+
 function formatTextBoxComment(tb: TextBoxInfo): string {
   const sizeW = emuToPt(tb.size.width);
   const sizeH = emuToPt(tb.size.height);
@@ -119,6 +170,8 @@ export async function analyzeTemplate(
   const res = await api.presentations.get({presentationId});
   const presentation = res.data;
   const slides = presentation.slides ?? [];
+  const pageWidth = presentation.pageSize?.width?.magnitude ?? 0;
+  const pageHeight = presentation.pageSize?.height?.magnitude ?? 0;
 
   // Build the YAML structure
   const slidesMap: Record<number, unknown> = {};
@@ -169,6 +222,17 @@ export async function analyzeTemplate(
         slotsMap[slot.role] = {element_index: slot.element_index};
       }
       slideEntry.slots = slotsMap;
+    }
+
+    if (textBoxes.length > 0 && pageWidth > 0 && pageHeight > 0) {
+      const imageArea = computeImageAreaFromTextBoxes(
+        textBoxes,
+        pageWidth,
+        pageHeight
+      );
+      if (imageArea) {
+        slideEntry.image_area = imageArea;
+      }
     }
 
     slidesMap[slideNumber] = slideEntry;

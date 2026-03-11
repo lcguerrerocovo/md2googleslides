@@ -137,7 +137,14 @@ slides:
         element_index: 0
       body:
         element_index: 1
+    image_area:
+      x: 4572000
+      y: 1200000
+      width: 4000000
+      height: 3400000
 ```
+
+The `image_area` field defines where images and tables are placed on template slides (coordinates in EMU). When omitted, the tool computes a free area automatically based on text box positions. Run `--analyze-template` to auto-generate reasonable defaults, then adjust manually if needed.
 
 3. **Reference template slides in markdown** using `{template_slide=N}` (1-based index):
 

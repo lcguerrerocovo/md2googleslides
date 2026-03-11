@@ -34,6 +34,7 @@ import {
 } from './presentation_helpers';
 import {
   ManifestSlotDef,
+  ManifestSlideDef,
   TemplateManifest,
   resolveSlotElement,
   resolveSlotObjectId,
@@ -184,7 +185,7 @@ export default class GenericLayout {
           }
           // Images in template body — place in free slide area, not the text box
           if (this.slide.bodies[i].images?.length) {
-            const imageBox = this.computeImageArea(usedSlotElements);
+            const imageBox = this.resolveImageArea(slideDef, usedSlotElements);
             this.appendCreateImageRequests(
               this.slide.bodies[i].images,
               imageBox,
@@ -194,7 +195,7 @@ export default class GenericLayout {
         }
         // Tables in template slides — position within body area
         if (this.slide.tables.length) {
-          const tableBox = this.computeImageArea(usedSlotElements);
+          const tableBox = this.resolveImageArea(slideDef, usedSlotElements);
           this.appendCreateTableRequests(this.slide.tables, requests, tableBox);
         }
       }
@@ -785,6 +786,16 @@ export default class GenericLayout {
     return this.getBodyBoundingBox(
       placeholderOrBox as SlidesV1.Schema$PageElement
     );
+  }
+
+  protected resolveImageArea(
+    slideDef: ManifestSlideDef,
+    usedElements: SlidesV1.Schema$PageElement[]
+  ): BoundingBox {
+    if (slideDef.image_area) {
+      return slideDef.image_area;
+    }
+    return this.computeImageArea(usedElements);
   }
 
   /**
