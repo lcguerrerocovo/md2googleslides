@@ -788,6 +788,10 @@ export default class GenericLayout {
     );
   }
 
+  /**
+   * Resolves the image/table placement area for a template slide.
+   * Uses manifest image_area if specified, otherwise computes free area.
+   */
   protected resolveImageArea(
     slideDef: ManifestSlideDef,
     usedElements: SlidesV1.Schema$PageElement[]

@@ -41,13 +41,7 @@ This will generate new Google Slides in your account with title `Talk Title`.
 NOTE: The first time the command is run you will be prompted for authorization. OAuth token
 credentials are stored locally in a file named `~/.md2googleslides/credentials.json`.
 
-Each time you will run the above comment, new slide deck will be generated. In order to work on exactly the same
-deck, just get the ID of the already generated slides. For example, you can use following command:
-
-```
-# To reuse deck available at: https://docs.google.com/presentation/d/<some id>/edit#
-md2gslides slides.md --title "Talk Title" --append <some id> --erase
-```
+Each time you run the above command, a new slide deck will be generated. For iterating on the same deck, use the **frontmatter workflow** (see below), which automatically manages the presentation ID.
 
 ## Frontmatter workflow
 
@@ -146,17 +140,17 @@ slides:
 
 The `image_area` field defines where images and tables are placed on template slides (coordinates in EMU). When omitted, the tool computes a free area automatically based on text box positions. Run `--analyze-template` to auto-generate reasonable defaults, then adjust manually if needed.
 
-3. **Reference template slides in markdown** using `{template_slide=N}` (1-based index):
+3. **Reference template slides in markdown** using `{template_slide="Name"}` (or `{template_slide=N}` for 1-based numeric index):
 
 <pre>
-{template_slide=8}
+{template_slide="Title slide"}
 
 # Presentation Title
 ## Subtitle goes here
 
 ---
 
-{template_slide=27}
+{template_slide="Content slide"}
 
 # Slide heading
 
@@ -169,7 +163,7 @@ Body content here
 md2gslides slides.md --template <TEMPLATE_ID> --manifest manifest.yaml -p <project> --title "My Deck"
 ```
 
-Slides with `{template_slide=N}` are cloned from the template with full visual branding. Slides without it are created with the default layout.
+Slides with `{template_slide="Name"}` (or `{template_slide=N}`) are cloned from the template with full visual branding. Slides without it are created with the default layout.
 
 ### Multi-project credentials
 
@@ -286,7 +280,7 @@ on its own line with a blank both before and after.
 ### Themes
 
 `md2googleslides` does not edit or control any theme related options. Just set a base theme you want on Google Slides directly.
-Even if you will use `--append` option for deck reuse, theme will be not changed.
+The tool does not modify themes when updating an existing deck.
 
 ### Images
 
