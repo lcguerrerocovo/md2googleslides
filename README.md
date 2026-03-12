@@ -451,6 +451,45 @@ console.log('Hello world');
 ```{style="font-size: 36pt"}
 </pre>
 
+#### Code blocks on template slides
+
+On template slides, fenced code blocks are automatically rendered as **syntax-highlighted PNG images** using [silicon](https://github.com/Aloxaf/silicon) and placed in the slide's `image_area` (defined in the manifest). This produces much better results than inline text for code-heavy slides.
+
+<pre>
+{template_slide="Code Block Template"}
+
+# Example
+
+Description text goes here
+
+```python
+def hello():
+    print("world")
+```
+</pre>
+
+The code image uses the `OneHalfDark` theme by default. On non-template slides, code blocks continue to render as inline styled text (existing behavior).
+
+**Requires:** `silicon` (`brew install silicon`)
+
+### D2 diagrams
+
+[D2](https://d2lang.com) diagrams can be included as images by referencing a `.d2` file:
+
+<pre>
+![](path/to/diagram.d2)
+</pre>
+
+The `.d2` file is rendered to PNG at generation time and placed on the slide. On template slides, d2 images are placed in the `image_area`.
+
+Optional attributes control rendering:
+
+<pre>
+![](diagram.d2){theme=200 d2-layout=elk d2-scale=2}
+</pre>
+
+**Requires:** `d2` (`brew install d2`)
+
 ### Tables
 
 Tables are supported via
