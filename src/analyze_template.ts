@@ -176,11 +176,10 @@ export async function analyzeTemplate(
   // Build the YAML structure
   const slidesMap: Record<number, unknown> = {};
 
+  // First pass: collect all raw names so we can deduplicate
+  const rawNames: {name: string; textBoxes: TextBoxInfo[]}[] = [];
   for (let i = 0; i < slides.length; i++) {
     const slide = slides[i];
-    const slideId = slide.objectId ?? '';
-    const slideNumber = i + 1;
-
     const elements = slide.pageElements ?? [];
     const textBoxes: TextBoxInfo[] = [];
 
@@ -207,8 +206,30 @@ export async function analyzeTemplate(
       });
     }
 
+    rawNames.push({name: generateSlideName(textBoxes), textBoxes});
+  }
+
+  // Deduplicate: first occurrence keeps plain name, subsequent get " (2)", " (3)", etc.
+  const nameCounts: Record<string, number> = {};
+  for (const entry of rawNames) {
+    nameCounts[entry.name] = (nameCounts[entry.name] || 0) + 1;
+  }
+  const nameNextIndex: Record<string, number> = {};
+  const deduplicatedNames: string[] = rawNames.map(entry => {
+    if (nameCounts[entry.name] <= 1) return entry.name;
+    nameNextIndex[entry.name] = (nameNextIndex[entry.name] || 0) + 1;
+    if (nameNextIndex[entry.name] === 1) return entry.name;
+    return `${entry.name} (${nameNextIndex[entry.name]})`;
+  });
+
+  for (let i = 0; i < slides.length; i++) {
+    const slide = slides[i];
+    const slideId = slide.objectId ?? '';
+    const slideNumber = i + 1;
+    const textBoxes = rawNames[i].textBoxes;
+
     const previewUrl = `https://docs.google.com/presentation/d/${presentationId}/edit#slide=id.${slideId}`;
-    const slideName = generateSlideName(textBoxes);
+    const slideName = deduplicatedNames[i];
     const slots = classifySlots(textBoxes);
 
     const slideEntry: Record<string, unknown> = {
