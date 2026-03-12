@@ -18,6 +18,8 @@ import Token from 'markdown-it/lib/token';
 import parse5, {Element} from 'parse5';
 import fileUrl from 'file-url';
 import path from 'path';
+import fs from 'fs';
+import tmp from 'tmp-promise';
 import {ImageDefinition, SlideDefinition, StyleDefinition} from '../slides';
 import parseMarkdown, {extractFrontmatter} from './parser';
 import {Context} from './env';
@@ -221,9 +223,32 @@ inlineTokenRules['paragraph_close'] = (token, context) => {
 };
 
 inlineTokenRules['fence'] = (token, context) => {
+  const language = token.info ? token.info.trim() : undefined;
+
+  // On template slides, render code as an image for the image_area
+  if (context.currentSlide?.templateSlide !== undefined) {
+    const tmpFile = tmp.fileSync({postfix: language ? `.${language}` : '.txt'});
+    fs.writeFileSync(tmpFile.name, token.content);
+
+    const styleStr = language ? `lang=${language}` : '';
+    const image: ImageDefinition = {
+      url: undefined,
+      source: tmpFile.name,
+      type: 'code',
+      width: 0,
+      height: 0,
+      style: styleStr,
+      padding: 0,
+      offsetX: 0,
+      offsetY: 0,
+    };
+    context.images.push(image);
+    return;
+  }
+
+  // Non-template slides: keep existing inline text behavior
   const style = applyTokenStyle(token, {fontFamily: 'Courier New'});
   context.startStyle(style);
-  const language = token.info ? token.info.trim() : undefined;
   if (language) {
     highlightSyntax(token.content, language, context);
   } else {
