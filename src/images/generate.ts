@@ -16,6 +16,7 @@ import Debug from 'debug';
 import renderSVG from './svg';
 import renderMathJax from './/mathjax';
 import renderD2 from './d2';
+import renderCode from './code';
 import {ImageDefinition} from '../slides';
 import assert from 'assert';
 
@@ -25,6 +26,7 @@ const renderers: {[key: string]: (img: ImageDefinition) => Promise<String>} = {
   svg: renderSVG,
   math: renderMathJax,
   d2: renderD2,
+  code: renderCode,
 };
 
 /**
