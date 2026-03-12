@@ -14,13 +14,20 @@ the tool alive.
 
 ## Installation and usage
 
-For command line use, install md2gslides globally:
+Install globally from this repo:
 
 ```sh
-npm install -g md2gslides
+npm install -g git+https://github.com/lcguerrerocovo/md2googleslides.git
 ```
 
-Then get your OAuth client ID credentials:
+Optional dependencies for image rendering:
+
+```sh
+brew install silicon   # syntax-highlighted code block images
+brew install d2        # d2 diagram rendering
+```
+
+Then set up your OAuth client ID credentials:
 
 * Create (or reuse) a developer project at <https://console.developers.google.com>
 * Enable Google Slides API at [API library page](https://console.developers.google.com/apis/library)
